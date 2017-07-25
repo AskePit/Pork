@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>201</width>
-    <height>162</height>
+    <width>194</width>
+    <height>154</height>
    </rect>
   </property>
   <property name="mouseTracking">
@@ -15,9 +15,6 @@
   </property>
   <property name="acceptDrops">
    <bool>true</bool>
-  </property>
-  <property name="windowTitle">
-   <string/>
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -41,15 +38,6 @@
       <property name="palette">
        <palette>
         <active>
-         <colorrole role="Base">
-          <brush brushstyle="SolidPattern">
-           <color alpha="255">
-            <red>255</red>
-            <green>255</green>
-            <blue>255</blue>
-           </color>
-          </brush>
-         </colorrole>
          <colorrole role="Window">
           <brush brushstyle="SolidPattern">
            <color alpha="255">
@@ -61,15 +49,6 @@
          </colorrole>
         </active>
         <inactive>
-         <colorrole role="Base">
-          <brush brushstyle="SolidPattern">
-           <color alpha="255">
-            <red>255</red>
-            <green>255</green>
-            <blue>255</blue>
-           </color>
-          </brush>
-         </colorrole>
          <colorrole role="Window">
           <brush brushstyle="SolidPattern">
            <color alpha="255">
@@ -81,15 +60,6 @@
          </colorrole>
         </inactive>
         <disabled>
-         <colorrole role="Base">
-          <brush brushstyle="SolidPattern">
-           <color alpha="255">
-            <red>255</red>
-            <green>255</green>
-            <blue>255</blue>
-           </color>
-          </brush>
-         </colorrole>
          <colorrole role="Window">
           <brush brushstyle="SolidPattern">
            <color alpha="255">
@@ -105,9 +75,6 @@
       <property name="frameShape">
        <enum>QFrame::NoFrame</enum>
       </property>
-      <property name="lineWidth">
-       <number>0</number>
-      </property>
       <property name="widgetResizable">
        <bool>true</bool>
       </property>
@@ -119,8 +86,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>201</width>
-         <height>162</height>
+         <width>194</width>
+         <height>154</height>
         </rect>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -147,9 +114,9 @@
              <colorrole role="Base">
               <brush brushstyle="SolidPattern">
                <color alpha="255">
-                <red>50</red>
-                <green>50</green>
-                <blue>50</blue>
+                <red>36</red>
+                <green>36</green>
+                <blue>36</blue>
                </color>
               </brush>
              </colorrole>
@@ -158,9 +125,9 @@
              <colorrole role="Base">
               <brush brushstyle="SolidPattern">
                <color alpha="255">
-                <red>50</red>
-                <green>50</green>
-                <blue>50</blue>
+                <red>36</red>
+                <green>36</green>
+                <blue>36</blue>
                </color>
               </brush>
              </colorrole>
@@ -178,12 +145,59 @@
             </disabled>
            </palette>
           </property>
+          <property name="styleSheet">
+           <string notr="true"/>
+          </property>
           <property name="frameShape">
            <enum>QFrame::NoFrame</enum>
           </property>
-          <property name="lineWidth">
-           <number>0</number>
-          </property>
+          <widget class="QSlider" name="progressSlider">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>84</width>
+             <height>19</height>
+            </rect>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+          <widget class="QSlider" name="volumeSlider">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>19</width>
+             <height>84</height>
+            </rect>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+          </widget>
+          <widget class="QLabel" name="codecErrorLabel">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>241</width>
+             <height>51</height>
+            </rect>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>20</pointsize>
+            </font>
+           </property>
+           <property name="text">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;Unknown codec!&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
          </widget>
         </item>
         <item>

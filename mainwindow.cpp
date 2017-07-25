@@ -31,8 +31,6 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_player(this)
-    , m_volumeSlider(Qt::Vertical)
-    , m_progressSlider(Qt::Horizontal)
 {
     ui->setupUi(this);
 
@@ -40,31 +38,18 @@ MainWindow::MainWindow(QWidget *parent)
     ui->videoView->setScene(new QGraphicsScene);
     ui->videoView->scene()->addItem(&m_graphicsItem);
 
-    m_codecErrorLabel.setPos(0, 0);
-    m_codecErrorLabel.setScale(5);
-    m_codecErrorLabel.setDefaultTextColor(QColor(Qt::white));
-    m_codecErrorLabel.setPlainText("Unknown Codec!");
-    ui->videoView->scene()->addItem(&m_codecErrorLabel);
-    m_codecErrorLabel.hide();
+    ui->volumeSlider->setRange(0, 100);
 
-    m_volumeSlider.setParent(ui->videoView);
-    m_volumeSlider.setRange(0, 100);
-    m_volumeSlider.move(0, 0);
-    m_volumeSlider.show();
-
-    m_progressSlider.setParent(ui->videoView);
-    m_progressSlider.setRange(0, 100);
-    m_progressSlider.move(20, 0);
-    m_progressSlider.show();
-
-    connect(&m_player, &QMediaPlayer::volumeChanged, &m_volumeSlider, &QSlider::setValue);
-    connect(&m_player, &QMediaPlayer::durationChanged, &m_progressSlider, &QSlider::setMaximum);
-    connect(&m_player, &QMediaPlayer::positionChanged, &m_progressSlider, &QSlider::setValue);
+    connect(&m_player, &QMediaPlayer::volumeChanged, ui->volumeSlider, &QSlider::setValue);
+    connect(&m_player, &QMediaPlayer::durationChanged, ui->progressSlider, &QSlider::setMaximum);
+    connect(&m_player, &QMediaPlayer::positionChanged, ui->progressSlider, &QSlider::setValue);
 
     connect(&m_graphicsItem, &QGraphicsVideoItem::nativeSizeChanged, this, &MainWindow::calcVideoFactor);
     connect(&m_player, &QMediaPlayer::mediaStatusChanged, [this](QMediaPlayer::MediaStatus status){
         if(status == QMediaPlayer::InvalidMedia) {
-            m_codecErrorLabel.show();
+            ui->codecErrorLabel->show();
+            ui->volumeSlider->hide();
+            ui->progressSlider->hide();
         }
     });
 
@@ -87,9 +72,9 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event)
 
     QString url { data->urls().first().toString() };
 
-    bool pic = fileBelongsTo(url, supportedImages);
-    bool gif = fileBelongsTo(url, supportedGif);
-    bool video = fileBelongsTo(url, supportedVideo);
+    bool pic { fileBelongsTo(url, supportedImages) };
+    bool gif { fileBelongsTo(url, supportedGif) };
+    bool video { fileBelongsTo(url, supportedVideo) };
 
     if(!pic && !gif && !video) {
         event->ignore();
@@ -106,6 +91,27 @@ void MainWindow::dropEvent(QDropEvent *event)
         QUrl url {data->urls().first()};
         openFile(url.toLocalFile());
     }
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QRect window { QPoint{}, event->size()};
+    QRect label { ui->codecErrorLabel->rect() };
+    QRect volume { ui->volumeSlider->rect() };
+    QRect progress { ui->progressSlider->rect() };
+
+    const int pad {20};
+
+    label.moveCenter(window.center());
+    volume.moveRight(window.right()-pad);
+    volume.moveTop(pad);
+    progress.moveLeft(pad);
+    progress.moveBottom(window.bottom()-pad/2);
+    progress.setWidth(window.width()-2*pad);
+
+    ui->codecErrorLabel->setGeometry(label);
+    ui->volumeSlider->setGeometry(volume);
+    ui->progressSlider->setGeometry(progress);
 }
 
 bool MainWindow::openFile(const QString &filename)
@@ -197,7 +203,7 @@ void MainWindow::calcImageFactor()
 {
     int w { m_image.width() };
     int h { m_image.height() };
-    auto screen = QApplication::desktop()->screenGeometry();
+    auto screen { QApplication::desktop()->screenGeometry() };
 
     qreal sW = screen.width() - screenReserve;
     qreal sH = screen.height() - screenReserve;
@@ -211,14 +217,20 @@ void MainWindow::calcImageFactor()
 
 void MainWindow::calcVideoFactor(const QSizeF &nativeSize)
 {
-    QSize screenSize = QApplication::desktop()->screenGeometry().size();
+    QSize screenSize { size() };
 
-    bool nativeFits = nativeSize.boundedTo(screenSize) == nativeSize;
+    bool nativeFits { nativeSize.boundedTo(screenSize) == nativeSize };
     if(nativeFits) {
         m_graphicsItem.setSize(nativeSize);
     } else {
         m_graphicsItem.setSize(nativeSize.scaled(screenSize, Qt::KeepAspectRatio));
     }
+
+    QPoint pos { rect().center() };
+    QSizeF viewSize { m_graphicsItem.size() };
+    pos.rx() -= viewSize.width()/2.;
+    pos.ry() -= viewSize.height()/2.;
+    m_graphicsItem.setPos(pos);
 }
 
 void MainWindow::applyImage()
@@ -238,16 +250,16 @@ void MainWindow::applyGif()
 
 static void centerScrollArea(QScrollArea *area, QLabel* label)
 {
-    auto screen = QApplication::desktop()->screenGeometry();
-    auto pixmap = label->pixmap();
-    int w = (pixmap->width() - screen.width() + screenReserve)/2;
-    int h = (pixmap->height() - screen.height() + screenReserve)/2;
+    auto screen { QApplication::desktop()->screenGeometry() };
+    auto pixmap { label->pixmap() };
+    int w { (pixmap->width() - screen.width() + screenReserve)/2 };
+    int h { (pixmap->height() - screen.height() + screenReserve)/2 };
 
     area->horizontalScrollBar()->setValue(w);
     area->verticalScrollBar()->setValue(h);
 }
 
-bool MainWindow::zoom(ZoomDir::type dir, ZoomType::type type)
+bool MainWindow::zoom(Direction::type dir, ZoomType::type type)
 {
     if(m_mode == MediaMode::Video) {
         return false;
@@ -265,15 +277,11 @@ bool MainWindow::zoom(ZoomDir::type dir, ZoomType::type type)
         return false;
     }
 
-    /*if(m_mode == MediaMode::Gif && result >= 2.0) {
-        return false;
-    }*/
-
     if(result >= 4.0) {
         return false;
     }
 
-    const int zoomDelay = 5; //ms
+    const int zoomDelay {5}; //ms
     if(m_zoomTimer.elapsed() > zoomDelay) {
         m_scaleFactor = result;
 
@@ -294,11 +302,13 @@ void MainWindow::setMode(MediaMode::type type)
 {
     m_mode = type;
     m_scaleFactor = 1.0;
-    m_codecErrorLabel.hide();
+    ui->codecErrorLabel->hide();
 
     if(m_mode == MediaMode::Video) {
         ui->label->hide();
         ui->videoView->show();
+        ui->volumeSlider->show();
+        ui->progressSlider->show();
         m_zoomTimer.invalidate();
     } else {
         ui->label->show();
@@ -320,6 +330,27 @@ static QFileInfoList getDirFiles(const QString &path)
     return res;
 }
 
+void MainWindow::gotoNextFile(Direction::type dir)
+{
+    QFileInfoList files = getDirFiles(m_currentFile.dir().path());
+
+    int i { files.indexOf(m_currentFile) };
+    if(dir == Direction::Backward) {
+        i -= 1;
+        if(i < 0) {
+            i = files.size()-1;
+        }
+    } else {
+        i += 1;
+        if(i >= files.size()) {
+            i = 0;
+        }
+    }
+
+    m_currentFile = files[i];
+    loadFile();
+}
+
 static QPoint clickPoint;
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
@@ -331,30 +362,12 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             auto key { keyEvent->key() };
             switch(key) {
                 case Qt::Key_Escape: qApp->quit(); return true;
-                case Qt::Key_Left:
-                case Qt::Key_Right: {
-                    QFileInfoList files = getDirFiles(m_currentFile.dir().path());
-
-                    int i { files.indexOf(m_currentFile) };
-                    if(key == Qt::Key_Left) {
-                        i -= 1;
-                        if(i < 0) {
-                            i = files.size()-1;
-                        }
-                    } else {
-                        i += 1;
-                        if(i >= files.size()) {
-                            i = 0;
-                        }
-                    }
-
-                    m_currentFile = files[i];
-                    loadFile();
-                    return true;
-                } break;
-
-                case Qt::Key_Plus:  zoom(ZoomDir::In, ZoomType::Button); return true;
-                case Qt::Key_Minus: zoom(ZoomDir::Out, ZoomType::Button); return true;
+                case Qt::Key_Left: gotoNextFile(Direction::Backward); return true;
+                case Qt::Key_Right: gotoNextFile(Direction::Forward); return true;
+                case Qt::Key_Plus:  zoom(Direction::Forward, ZoomType::Button); return true;
+                case Qt::Key_Minus: zoom(Direction::Backward, ZoomType::Button); return true;
+                case Qt::Key_Up: m_volume += 2; m_player.setVolume(m_volume); return true;
+                case Qt::Key_Down: m_volume -= 2; m_player.setVolume(m_volume); return true;
             }
         } break;
 
@@ -362,10 +375,10 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             QWheelEvent *wheelEvent { static_cast<QWheelEvent *>(event) };
 
             if(m_mode == MediaMode::Video) {
-                m_volume += wheelEvent->angleDelta().y()/20.0;
+                m_volume += wheelEvent->angleDelta().y()/15.0;
                 m_player.setVolume(m_volume);
             } else {
-                ZoomDir::type dir { wheelEvent->delta() > 0 ? ZoomDir::In : ZoomDir::Out };
+                Direction::type dir { wheelEvent->delta() > 0 ? Direction::Forward : Direction::Backward };
                 zoom(dir, ZoomType::Wheel);
             }
             return true;
@@ -403,6 +416,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             return true;
 
         } break;
+        default: break;
     }
 
     return QMainWindow::eventFilter(watched, event);

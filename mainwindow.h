@@ -5,7 +5,6 @@
 #include <QElapsedTimer>
 #include <QMediaPlayer>
 #include <QGraphicsVideoItem>
-#include <QSlider>
 #include <QMovie>
 #include <QDir>
 
@@ -22,9 +21,9 @@ enum_class(ZoomType) {
     Wheel
 } enum_end;
 
-enum_class(ZoomDir) {
-    In = 0,
-    Out
+enum_class(Direction) {
+    Forward = 0,
+    Backward
 } enum_end;
 
 enum_class(MediaMode) {
@@ -51,11 +50,13 @@ public slots:
     void calcVideoFactor(const QSizeF &nativeSize);
     void applyImage();
     void applyGif();
+    void gotoNextFile(Direction::type dir);
 
-    bool zoom(ZoomDir::type dir, ZoomType::type type);
+    bool zoom(Direction::type dir, ZoomType::type type);
     void setMode(MediaMode::type type);
 
 protected:
+    virtual void resizeEvent(QResizeEvent *event) override;
     virtual bool eventFilter(QObject *watched, QEvent *event) override;
     virtual void dragEnterEvent(QDragEnterEvent *) override;
     virtual void dropEvent(QDropEvent *) override;
@@ -72,9 +73,6 @@ private:
 
     QMediaPlayer m_player;
     QGraphicsVideoItem m_graphicsItem;
-    QGraphicsTextItem m_codecErrorLabel;
-    QSlider m_volumeSlider;
-    QSlider m_progressSlider;
     int m_volume {0};
     QElapsedTimer m_zoomTimer;
 };
