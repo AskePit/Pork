@@ -17,6 +17,9 @@
    <bool>true</bool>
   </property>
   <widget class="QWidget" name="centralWidget">
+   <property name="mouseTracking">
+    <bool>true</bool>
+   </property>
    <layout class="QVBoxLayout" name="verticalLayout">
     <property name="spacing">
      <number>0</number>
@@ -72,6 +75,9 @@
         </disabled>
        </palette>
       </property>
+      <property name="mouseTracking">
+       <bool>true</bool>
+      </property>
       <property name="frameShape">
        <enum>QFrame::NoFrame</enum>
       </property>
@@ -89,6 +95,9 @@
          <width>194</width>
          <height>154</height>
         </rect>
+       </property>
+       <property name="mouseTracking">
+        <bool>true</bool>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <property name="spacing">
@@ -145,8 +154,54 @@
             </disabled>
            </palette>
           </property>
+          <property name="mouseTracking">
+           <bool>true</bool>
+          </property>
           <property name="styleSheet">
-           <string notr="true"/>
+           <string notr="true">QSlider::groove:horizontal {
+background: #eee;
+height: 2px;
+}
+
+QSlider::groove:horizontal:hover {
+background: #eee;
+height: 4px;
+}
+
+QSlider::groove:vertical {
+background: #eee;
+width: 2px;
+}
+
+QSlider::groove:vertical:hover {
+background: #eee;
+width:4px;
+}
+
+QSlider::sub-page:horizontal {
+background: white;
+height: 2px;
+}
+
+QSlider::add-page:horizontal {
+background: #777;
+height: 2px;
+}
+
+QSlider::sub-page:vertical {
+background: #777;
+width: 2px;
+}
+
+QSlider::add-page:vertical {
+background: white;
+width: 2px;
+}
+
+QSlider::handle {
+width: 0px;
+height: 0px;
+}</string>
           </property>
           <property name="frameShape">
            <enum>QFrame::NoFrame</enum>
@@ -160,6 +215,9 @@
              <height>19</height>
             </rect>
            </property>
+           <property name="focusPolicy">
+            <enum>Qt::NoFocus</enum>
+           </property>
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
@@ -172,6 +230,9 @@
              <width>19</width>
              <height>84</height>
             </rect>
+           </property>
+           <property name="focusPolicy">
+            <enum>Qt::NoFocus</enum>
            </property>
            <property name="orientation">
             <enum>Qt::Vertical</enum>

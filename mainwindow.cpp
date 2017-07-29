@@ -10,7 +10,53 @@
 #include <QDropEvent>
 #include <QMimeData>
 #include <QScrollBar>
+#include <QProxyStyle>
 #include <QDebug>
+
+// This makes QSliders set their position strictly to the pointed position instead of stepping
+class QSliderStyle : public QProxyStyle
+{
+public:
+    using QProxyStyle::QProxyStyle;
+
+    int styleHint(QStyle::StyleHint hint, const QStyleOption *option = 0, const QWidget *widget = 0, QStyleHintReturn *returnData = 0) const
+    {
+        if (hint == QStyle::SH_Slider_AbsoluteSetButtons)
+            return (Qt::LeftButton | Qt::MidButton | Qt::RightButton);
+        return QProxyStyle::styleHint(hint, option, widget, returnData);
+    }
+};
+
+// Blocks undesired events for a widget
+class Blocker : public QWidget
+{
+public:
+    virtual bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        switch(event->type()) {
+            case QEvent::MouseButtonPress:
+            case QEvent::MouseButtonRelease:
+            case QEvent::MouseMove:
+            case QEvent::KeyPress:
+            case QEvent::Wheel:
+                event->ignore();
+                return true;
+
+            default:
+                return QWidget::eventFilter(watched, event);
+        }
+    }
+};
+
+static Blocker *blocker { nullptr };
+
+static void block(QAbstractScrollArea *w) {
+    if(!blocker) {
+        blocker = new Blocker;
+    }
+    w->installEventFilter(blocker);
+    w->viewport()->installEventFilter(blocker);
+}
 
 static const QStringList supportedImages { "*.jpg", "*.jpeg", "*.png", "*.bmp" };
 static const QStringList supportedGif { "*.gif" };
@@ -30,28 +76,55 @@ static bool fileBelongsTo(const QString &file, const QStringList &list)
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , m_player(this)
+    , m_videoPlayer(this)
 {
     ui->setupUi(this);
 
-    m_player.setVideoOutput(&m_graphicsItem);
+    m_videoPlayer.setVideoOutput(&m_graphicsItem);
     ui->videoView->setScene(new QGraphicsScene);
     ui->videoView->scene()->addItem(&m_graphicsItem);
 
     ui->volumeSlider->setRange(0, 100);
 
-    connect(&m_player, &QMediaPlayer::volumeChanged, ui->volumeSlider, &QSlider::setValue);
-    connect(&m_player, &QMediaPlayer::durationChanged, ui->progressSlider, &QSlider::setMaximum);
-    connect(&m_player, &QMediaPlayer::positionChanged, ui->progressSlider, &QSlider::setValue);
+    ui->volumeSlider->setStyle(new QSliderStyle(ui->volumeSlider->style()));
+    ui->progressSlider->setStyle(new QSliderStyle(ui->progressSlider->style()));
+
+    block(ui->scrollArea);
+    block(ui->videoView);
+
+    connect(ui->volumeSlider, &QSlider::valueChanged, [this](int volume){
+        m_videoPlayer.setVolume(volume);
+        showSliders();
+    });
+    connect(&m_videoPlayer, &QMediaPlayer::durationChanged, ui->progressSlider, &QSlider::setMaximum);
+    connect(&m_videoPlayer, &QMediaPlayer::positionChanged, [this](quint64 position) {
+        if(m_userChangedVideoPos) {
+            showSliders();
+            m_userChangedVideoPos = false;
+        } else {
+            ui->progressSlider->setValue(position);
+        }
+    });
+    connect(ui->progressSlider, &QSlider::sliderReleased, [this](){
+        m_userChangedVideoPos = true;
+        m_videoPlayer.setPosition(ui->progressSlider->value());
+        if(m_videoPlayer.state() == QMediaPlayer::StoppedState) {
+            m_videoPlayer.play();
+        }
+    });
 
     connect(&m_graphicsItem, &QGraphicsVideoItem::nativeSizeChanged, this, &MainWindow::calcVideoFactor);
-    connect(&m_player, &QMediaPlayer::mediaStatusChanged, [this](QMediaPlayer::MediaStatus status){
+    connect(&m_videoPlayer, &QMediaPlayer::mediaStatusChanged, [this](QMediaPlayer::MediaStatus status){
         if(status == QMediaPlayer::InvalidMedia) {
             ui->codecErrorLabel->show();
             ui->volumeSlider->hide();
             ui->progressSlider->hide();
         }
     });
+
+    m_slidersTimer.setSingleShot(true);
+    connect(&m_slidersTimer, &QTimer::timeout, ui->progressSlider, &QSlider::hide);
+    connect(&m_slidersTimer, &QTimer::timeout, ui->volumeSlider, &QSlider::hide);
 
     setMode(MediaMode::Image);
 }
@@ -103,7 +176,7 @@ void MainWindow::resizeEvent(QResizeEvent *event)
     const int pad {20};
 
     label.moveCenter(window.center());
-    volume.moveRight(window.right()-pad);
+    volume.moveRight(window.right()-pad/2);
     volume.moveTop(pad);
     progress.moveLeft(pad);
     progress.moveBottom(window.bottom()-pad/2);
@@ -120,7 +193,6 @@ bool MainWindow::openFile(const QString &filename)
     bool ok { loadFile() };
     if(ok) {
         showFullScreen();
-        qApp->installEventFilter(this);
     }
 
     return ok;
@@ -164,8 +236,6 @@ bool MainWindow::loadImage()
     calcImageFactor();
     applyImage();
 
-    m_zoomTimer.start();
-
     return true;
 }
 
@@ -188,11 +258,11 @@ bool MainWindow::loadVideo()
     QString filePath { m_currentFile.absoluteFilePath() };
 
     setMode(MediaMode::Video);
-    m_player.setMedia(QUrl{filePath});
-    m_volume = 0;
-    m_player.setVolume(0);
+    m_videoPlayer.setMedia(QUrl{filePath});
+    m_videoPlayer.setVolume(0);
+    ui->volumeSlider->setValue(0);
 
-    m_player.play();
+    m_videoPlayer.play();
 
     return true;
 }
@@ -212,6 +282,8 @@ void MainWindow::calcImageFactor()
     qreal hRatio { sH/h };
     if(wRatio < 1.0 || hRatio < 1.0) {
         m_scaleFactor = std::min(wRatio, hRatio);
+    } else {
+        m_scaleFactor = 1.0;
     }
 }
 
@@ -307,14 +379,14 @@ void MainWindow::setMode(MediaMode::type type)
     if(m_mode == MediaMode::Video) {
         ui->label->hide();
         ui->videoView->show();
-        ui->volumeSlider->show();
-        ui->progressSlider->show();
+        showSliders();
         m_zoomTimer.invalidate();
     } else {
         ui->label->show();
         ui->videoView->hide();
-        m_player.stop();
+        m_videoPlayer.stop();
         m_gifPlayer.stop();
+        m_zoomTimer.start();
     }
 }
 
@@ -332,7 +404,7 @@ static QFileInfoList getDirFiles(const QString &path)
 
 void MainWindow::gotoNextFile(Direction::type dir)
 {
-    QFileInfoList files = getDirFiles(m_currentFile.dir().path());
+    QFileInfoList files { getDirFiles(m_currentFile.dir().path()) };
 
     int i { files.indexOf(m_currentFile) };
     if(dir == Direction::Backward) {
@@ -351,9 +423,69 @@ void MainWindow::gotoNextFile(Direction::type dir)
     loadFile();
 }
 
-static QPoint clickPoint;
+void MainWindow::videoRewind(Direction::type dir)
+{
+    m_userChangedVideoPos = true;
 
-bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+    auto duration { m_videoPlayer.duration() };
+    auto position { m_videoPlayer.position() };
+
+    const qreal percent = duration/100.;
+    const qreal step = dir == Direction::Forward ? 5*percent : -5*percent;
+
+    position += step;
+
+    m_videoPlayer.setPosition(position);
+}
+
+bool MainWindow::dragImage(QPoint p)
+{
+    m_mouseDraging = true;
+
+    auto hBar { ui->scrollArea->horizontalScrollBar() };
+    auto vBar { ui->scrollArea->verticalScrollBar() };
+    bool barsVisible { hBar->isVisible() || vBar->isVisible() };
+
+    if(!barsVisible) {
+        return false;
+    }
+
+    QPoint diff { m_clickPoint - p };
+    hBar->setValue(hBar->value() + diff.x());
+    vBar->setValue(vBar->value() + diff.y());
+    m_clickPoint = p;
+
+    return true;
+}
+
+void MainWindow::showSliders()
+{
+    ui->progressSlider->show();
+    ui->volumeSlider->show();
+
+    m_slidersTimer.start(2000);
+}
+
+void MainWindow::onClick()
+{
+    QWidget *w { ui->videoView->childAt(m_clickPoint) };
+    if(w == ui->volumeSlider || w == ui->progressSlider) {
+        return;
+    }
+
+    int screenWidth { size().width() };
+    int x { m_clickPoint.x() };
+
+    qreal rx { x/static_cast<qreal>(screenWidth) };
+
+    if(rx <= 1/5.) {
+        gotoNextFile(Direction::Backward);
+    } else if(rx >= 4/5.) {
+        gotoNextFile(Direction::Forward);
+    }
+}
+
+bool MainWindow::event(QEvent *event)
 {
     switch(event->type()) {
         case QEvent::KeyPress: {
@@ -362,12 +494,69 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             auto key { keyEvent->key() };
             switch(key) {
                 case Qt::Key_Escape: qApp->quit(); return true;
-                case Qt::Key_Left: gotoNextFile(Direction::Backward); return true;
-                case Qt::Key_Right: gotoNextFile(Direction::Forward); return true;
+                case Qt::Key_Left: {
+                    bool ctrl { keyEvent->modifiers() & Qt::ControlModifier };
+                    if(m_mode == MediaMode::Video && ctrl) {
+                        videoRewind(Direction::Backward); return true;
+                    } else {
+                        gotoNextFile(Direction::Backward); return true;
+                    }
+                }
+                case Qt::Key_Right: {
+                    bool ctrl { keyEvent->modifiers() & Qt::ControlModifier };
+                    if(m_mode == MediaMode::Video && ctrl) {
+                        videoRewind(Direction::Forward); return true;
+                    } else {
+                        gotoNextFile(Direction::Forward); return true;
+                    }
+                }
                 case Qt::Key_Plus:  zoom(Direction::Forward, ZoomType::Button); return true;
                 case Qt::Key_Minus: zoom(Direction::Backward, ZoomType::Button); return true;
-                case Qt::Key_Up: m_volume += 2; m_player.setVolume(m_volume); return true;
-                case Qt::Key_Down: m_volume -= 2; m_player.setVolume(m_volume); return true;
+                case Qt::Key_Up: {
+                    if(m_mode == MediaMode::Video) {
+                        ui->volumeSlider->setValue(ui->volumeSlider->value() + 4);
+                    } else {
+                        zoom(Direction::Forward, ZoomType::Button); return true;
+                    }
+                    return true;
+                }
+                case Qt::Key_Down: {
+                    if(m_mode == MediaMode::Video) {
+                        ui->volumeSlider->setValue(ui->volumeSlider->value() - 4);
+                    } else {
+                        zoom(Direction::Backward, ZoomType::Button); return true;
+                    }
+                    return true;
+                }
+                case Qt::Key_Space: {
+                    if(m_mode == MediaMode::Video){
+                        if(m_videoPlayer.state() == QMediaPlayer::StoppedState || m_videoPlayer.state() == QMediaPlayer::PausedState) {
+                            m_videoPlayer.play();
+                        } else if(m_videoPlayer.state() == QMediaPlayer::PlayingState) {
+                            m_videoPlayer.pause();
+                        }
+                    } else if(m_mode == MediaMode::Image) {
+                        calcImageFactor();
+                        applyImage();
+                    } else if(m_mode == MediaMode::Gif) {
+                        m_scaleFactor = 1.0;
+                        applyGif();
+                    }
+                    return true;
+
+                } break;
+
+                case Qt::Key_Return: {
+                    if(m_mode == MediaMode::Image) {
+                        calcImageFactor();
+                        applyImage();
+                    } else if(m_mode == MediaMode::Gif) {
+                        m_scaleFactor = 1.0;
+                        applyGif();
+                    }
+                    return true;
+                } break;
+                default: break;
             }
         } break;
 
@@ -375,8 +564,8 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             QWheelEvent *wheelEvent { static_cast<QWheelEvent *>(event) };
 
             if(m_mode == MediaMode::Video) {
-                m_volume += wheelEvent->angleDelta().y()/15.0;
-                m_player.setVolume(m_volume);
+                int val { ui->volumeSlider->value() };
+                ui->volumeSlider->setValue(val + wheelEvent->angleDelta().y()/15.0);
             } else {
                 Direction::type dir { wheelEvent->delta() > 0 ? Direction::Forward : Direction::Backward };
                 zoom(dir, ZoomType::Wheel);
@@ -386,38 +575,32 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 
         case QEvent::MouseButtonPress: {
             QMouseEvent *pressEvent { static_cast<QMouseEvent *>(event) };
-            clickPoint = pressEvent->pos();
-            return true;
+            m_clickPoint = pressEvent->pos();
+            //return false;
         } break;
 
         case QEvent::MouseButtonRelease: {
-            return true;
+            if(!m_mouseDraging) {
+                onClick();
+            }
+            m_mouseDraging = false;
         } break;
 
         case QEvent::MouseMove: {
+            if(m_mode == MediaMode::Video) {
+                showSliders();
+            }
+
             QMouseEvent *moveEvent { static_cast<QMouseEvent *>(event) };
             bool isLeftClicked { moveEvent->buttons() & Qt::LeftButton };
             if(!isLeftClicked) {
                 return false;
             }
 
-            auto hBar { ui->scrollArea->horizontalScrollBar() };
-            auto vBar { ui->scrollArea->verticalScrollBar() };
-            bool barsVisible { hBar->isVisible() || vBar->isVisible() };
-
-            if(!barsVisible) {
-                return false;
-            }
-
-            QPoint diff { clickPoint - moveEvent->pos() };
-            hBar->setValue(hBar->value() + diff.x());
-            vBar->setValue(vBar->value() + diff.y());
-            clickPoint = moveEvent->pos();
-            return true;
-
+            return dragImage(moveEvent->pos());
         } break;
         default: break;
     }
 
-    return QMainWindow::eventFilter(watched, event);
+    return QMainWindow::event(event);
 }

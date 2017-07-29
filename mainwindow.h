@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QElapsedTimer>
+#include <QTimer>
 #include <QMediaPlayer>
 #include <QGraphicsVideoItem>
 #include <QMovie>
@@ -51,13 +52,18 @@ public slots:
     void applyImage();
     void applyGif();
     void gotoNextFile(Direction::type dir);
+    void videoRewind(Direction::type dir);
+    bool dragImage(QPoint p);
+    void showSliders();
 
     bool zoom(Direction::type dir, ZoomType::type type);
     void setMode(MediaMode::type type);
 
+    void onClick();
+
 protected:
     virtual void resizeEvent(QResizeEvent *event) override;
-    virtual bool eventFilter(QObject *watched, QEvent *event) override;
+    virtual bool event(QEvent *event) override;
     virtual void dragEnterEvent(QDragEnterEvent *) override;
     virtual void dropEvent(QDropEvent *) override;
 
@@ -66,15 +72,19 @@ private:
 
     MediaMode::type m_mode { MediaMode::Image };
     QFileInfo m_currentFile;
+
     QImage m_image;
     QMovie m_gifPlayer;
+    QMediaPlayer m_videoPlayer;
+    QGraphicsVideoItem m_graphicsItem;
+
     QSize m_gifOriginalSize;
     qreal m_scaleFactor { 1.0 };
-
-    QMediaPlayer m_player;
-    QGraphicsVideoItem m_graphicsItem;
-    int m_volume {0};
     QElapsedTimer m_zoomTimer;
+    QTimer m_slidersTimer;
+    QPoint m_clickPoint;
+    bool m_mouseDraging { false };
+    bool m_userChangedVideoPos { false };
 };
 
 #endif // MAINWINDOW_H
