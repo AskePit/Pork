@@ -25,7 +25,8 @@ MainWindow::MainWindow(QWidget *parent)
     block(ui->scrollArea);
     block(ui->videoView);
 
-    setMode(MediaMode::Image);
+    setMediaMode(MediaMode::Image);
+    setAppMode(AppMode::DragDialog);
 }
 
 void MainWindow::setupVideoPlayer()
@@ -142,12 +143,25 @@ void MainWindow::resizeEvent(QResizeEvent *event)
     ui->progressSlider->setGeometry(progress);
 }
 
+void MainWindow::setAppMode(AppMode type)
+{
+    m_appMode = type;
+    if(type == AppMode::Fullscreen) {
+        showFullScreen();
+    } else {
+        setMediaMode(MediaMode::Image);
+        ui->label->clear();
+        showNormal();
+        ui->label->setText(tr("<html><head/><body><p><span style=\" color:#676767;\">Drag image/video here...</span></p></body></html>"));
+    }
+}
+
 bool MainWindow::openFile(const QString &filename)
 {
     m_currentFile = QFileInfo {filename};
     bool ok { loadFile() };
     if(ok) {
-        showFullScreen();
+        setAppMode(AppMode::Fullscreen);
     }
 
     return ok;
@@ -186,7 +200,7 @@ bool MainWindow::loadImage()
         return false;
     }
 
-    setMode(MediaMode::Image);
+    setMediaMode(MediaMode::Image);
 
     calcImageFactor();
     applyImage();
@@ -198,7 +212,7 @@ bool MainWindow::loadGif()
 {
     QString filePath { m_currentFile.absoluteFilePath() };
 
-    setMode(MediaMode::Gif);
+    setMediaMode(MediaMode::Gif);
     m_gifPlayer.setFileName(filePath);
     m_gifOriginalSize = QImageReader(filePath).size();
     m_gifPlayer.setScaledSize(m_gifOriginalSize);
@@ -212,7 +226,7 @@ bool MainWindow::loadVideo()
 {
     QString filePath { m_currentFile.absoluteFilePath() };
 
-    setMode(MediaMode::Video);
+    setMediaMode(MediaMode::Video);
     m_videoPlayer.setMedia(QUrl{filePath});
     m_videoPlayer.setVolume(tune::volume::min);
     ui->volumeSlider->setValue(0);
@@ -220,6 +234,27 @@ bool MainWindow::loadVideo()
     m_videoPlayer.play();
 
     return true;
+}
+
+void MainWindow::setMediaMode(MediaMode type)
+{
+    m_mediaMode = type;
+    m_scaleFactor = tune::zoom::origin;
+    ui->codecErrorLabel->hide();
+    ui->label->clear();
+
+    if(m_mediaMode == MediaMode::Video) {
+        ui->label->hide();
+        ui->videoView->show();
+        showSliders();
+        m_zoomTimer.invalidate();
+    } else {
+        ui->label->show();
+        ui->videoView->hide();
+        m_videoPlayer.stop();
+        m_gifPlayer.stop();
+        m_zoomTimer.start();
+    }
 }
 
 void MainWindow::calcImageFactor()
@@ -261,10 +296,10 @@ void MainWindow::calcVideoFactor(const QSizeF &nativeSize)
 
 void MainWindow::resetScale()
 {
-    if(m_mode == MediaMode::Image) {
+    if(m_mediaMode == MediaMode::Image) {
         calcImageFactor();
         applyImage();
-    } else if(m_mode == MediaMode::Gif) {
+    } else if(m_mediaMode == MediaMode::Gif) {
         m_scaleFactor = tune::zoom::origin;
         applyGif();
     }
@@ -287,7 +322,7 @@ void MainWindow::applyGif()
 
 bool MainWindow::zoom(Direction dir, InputType type)
 {
-    if(m_mode == MediaMode::Video) {
+    if(m_mediaMode == MediaMode::Video) {
         return false;
     }
 
@@ -305,7 +340,7 @@ bool MainWindow::zoom(Direction dir, InputType type)
     if(m_zoomTimer.elapsed() > tune::zoom::delay) {
         m_scaleFactor = result;
 
-        if(m_mode == MediaMode::Image) {
+        if(m_mediaMode == MediaMode::Image) {
             applyImage();
             centerScrollArea(ui->scrollArea, ui->label);
         } else {
@@ -332,26 +367,6 @@ bool MainWindow::volumeStep(Direction dir, InputType type)
     value = qBound(tune::volume::min, value, tune::volume::max);
     ui->volumeSlider->setValue(value);
     return true;
-}
-
-void MainWindow::setMode(MediaMode type)
-{
-    m_mode = type;
-    m_scaleFactor = tune::zoom::origin;
-    ui->codecErrorLabel->hide();
-
-    if(m_mode == MediaMode::Video) {
-        ui->label->hide();
-        ui->videoView->show();
-        showSliders();
-        m_zoomTimer.invalidate();
-    } else {
-        ui->label->show();
-        ui->videoView->hide();
-        m_videoPlayer.stop();
-        m_gifPlayer.stop();
-        m_zoomTimer.start();
-    }
 }
 
 void MainWindow::gotoNextFile(Direction dir)
@@ -442,12 +457,16 @@ void MainWindow::onClick()
 }
 
 
-#define imageMode m_mode == MediaMode::Image
-#define gifMode   m_mode == MediaMode::Gif
-#define videoMode m_mode == MediaMode::Video
+#define imageMode m_mediaMode == MediaMode::Image
+#define gifMode   m_mediaMode == MediaMode::Gif
+#define videoMode m_mediaMode == MediaMode::Video
 
 bool MainWindow::event(QEvent *event)
 {
+    if(m_appMode == AppMode::DragDialog) {
+        return QMainWindow::event(event);
+    }
+
     using namespace std::placeholders;
     auto zoomOrVolumeStep = std::bind(videoMode ? &MainWindow::volumeStep : &MainWindow::zoom, this, _1, _2);
 
@@ -463,7 +482,7 @@ bool MainWindow::event(QEvent *event)
             auto videoPlayPause = std::bind(paused ? &QMediaPlayer::play : &QMediaPlayer::pause, &m_videoPlayer);
 
             switch(key) {
-                case Qt::Key_Escape: qApp->quit(); return true;
+                case Qt::Key_Escape: setAppMode(AppMode::DragDialog); return true;
                 case Qt::Key_Left:   rewindOrGotoNext(Direction::Backward); return true;
                 case Qt::Key_Right:  rewindOrGotoNext(Direction::Forward); return true;
                 case Qt::Key_Plus:

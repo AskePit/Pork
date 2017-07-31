@@ -15,6 +15,12 @@ class MainWindow;
 
 namespace pork {
 
+enum AppMode
+{
+    DragDialog = 0,
+    Fullscreen,
+};
+
 enum InputType
 {
     Button = 0,
@@ -45,6 +51,9 @@ public:
 public:
     void setupVideoPlayer();
 
+    void setAppMode(AppMode type);
+    void setMediaMode(MediaMode type);
+
     bool openFile(const QString &fileName);
     bool loadFile();
     bool loadImage();
@@ -62,7 +71,7 @@ public:
 
     bool zoom(Direction dir, InputType type);
     bool volumeStep(Direction dir, InputType type);
-    void setMode(MediaMode type);
+
 
     void onClick();
 
@@ -75,7 +84,9 @@ protected:
 private:
     Ui::MainWindow *ui;
 
-    MediaMode m_mode { MediaMode::Image };
+    MediaMode m_mediaMode { MediaMode::Image };
+    AppMode m_appMode { AppMode::DragDialog };
+
     QFileInfo m_currentFile;
 
     QImage m_image;
