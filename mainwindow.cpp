@@ -1,77 +1,16 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
-#include <QImageReader>
-#include <QKeyEvent>
+#include "config.h"
+#include "utils.h"
+
 #include <QMessageBox>
 #include <QDirIterator>
 #include <QDesktopWidget>
-#include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QMimeData>
 #include <QScrollBar>
-#include <QProxyStyle>
 #include <QDebug>
-
-// This makes QSliders set their position strictly to the pointed position instead of stepping
-class QSliderStyle : public QProxyStyle
-{
-public:
-    using QProxyStyle::QProxyStyle;
-
-    int styleHint(QStyle::StyleHint hint, const QStyleOption *option = 0, const QWidget *widget = 0, QStyleHintReturn *returnData = 0) const
-    {
-        if (hint == QStyle::SH_Slider_AbsoluteSetButtons)
-            return (Qt::LeftButton | Qt::MidButton | Qt::RightButton);
-        return QProxyStyle::styleHint(hint, option, widget, returnData);
-    }
-};
-
-// Blocks undesired events for a widget
-class Blocker : public QWidget
-{
-public:
-    virtual bool eventFilter(QObject *watched, QEvent *event) override
-    {
-        switch(event->type()) {
-            case QEvent::MouseButtonPress:
-            case QEvent::MouseButtonRelease:
-            case QEvent::MouseMove:
-            case QEvent::KeyPress:
-            case QEvent::Wheel:
-                event->ignore();
-                return true;
-
-            default:
-                return QWidget::eventFilter(watched, event);
-        }
-    }
-};
-
-static Blocker *blocker { nullptr };
-
-static void block(QAbstractScrollArea *w) {
-    if(!blocker) {
-        blocker = new Blocker;
-    }
-    w->installEventFilter(blocker);
-    w->viewport()->installEventFilter(blocker);
-}
-
-static const QStringList supportedImages { "*.jpg", "*.jpeg", "*.png", "*.bmp" };
-static const QStringList supportedGif { "*.gif" };
-static const QStringList supportedVideo { "*.webm", "*.wmv", "*.mp4", "*.mpg" };
-
-static bool fileBelongsTo(const QString &file, const QStringList &list)
-{
-    for(const auto &ext : list) {
-        QRegExp reg {ext, Qt::CaseInsensitive, QRegExp::Wildcard};
-        if(reg.exactMatch(file)) {
-            return true;
-        }
-    }
-    return false;
-}
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -84,7 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->videoView->setScene(new QGraphicsScene);
     ui->videoView->scene()->addItem(&m_graphicsItem);
 
-    ui->volumeSlider->setRange(0, 100);
+    ui->volumeSlider->setRange(tune::volume::min, tune::volume::max);
 
     ui->volumeSlider->setStyle(new QSliderStyle(ui->volumeSlider->style()));
     ui->progressSlider->setStyle(new QSliderStyle(ui->progressSlider->style()));
@@ -145,9 +84,9 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event)
 
     QString url { data->urls().first().toString() };
 
-    bool pic { fileBelongsTo(url, supportedImages) };
-    bool gif { fileBelongsTo(url, supportedGif) };
-    bool video { fileBelongsTo(url, supportedVideo) };
+    bool pic { fileBelongsTo(url, cap::supportedImages) };
+    bool gif { fileBelongsTo(url, cap::supportedGif) };
+    bool video { fileBelongsTo(url, cap::supportedVideo) };
 
     if(!pic && !gif && !video) {
         event->ignore();
@@ -173,7 +112,7 @@ void MainWindow::resizeEvent(QResizeEvent *event)
     QRect volume { ui->volumeSlider->rect() };
     QRect progress { ui->progressSlider->rect() };
 
-    const int pad {20};
+    constexpr int pad { tune::slider::pad };
 
     label.moveCenter(window.center());
     volume.moveRight(window.right()-pad/2);
@@ -202,15 +141,15 @@ bool MainWindow::loadFile()
 {
     QString filePath { m_currentFile.absoluteFilePath() };
 
-    if(fileBelongsTo(filePath, supportedImages)) {
+    if(fileBelongsTo(filePath, cap::supportedImages)) {
         return loadImage();
     }
 
-    if(fileBelongsTo(filePath, supportedGif)) {
+    if(fileBelongsTo(filePath, cap::supportedGif)) {
         return loadGif();
     }
 
-    if(fileBelongsTo(filePath, supportedVideo)) {
+    if(fileBelongsTo(filePath, cap::supportedVideo)) {
         return loadVideo();
     }
 
@@ -259,7 +198,7 @@ bool MainWindow::loadVideo()
 
     setMode(MediaMode::Video);
     m_videoPlayer.setMedia(QUrl{filePath});
-    m_videoPlayer.setVolume(0);
+    m_videoPlayer.setVolume(tune::volume::min);
     ui->volumeSlider->setValue(0);
 
     m_videoPlayer.play();
@@ -267,23 +206,23 @@ bool MainWindow::loadVideo()
     return true;
 }
 
-const int screenReserve {2};
-
 void MainWindow::calcImageFactor()
 {
     int w { m_image.width() };
     int h { m_image.height() };
     auto screen { QApplication::desktop()->screenGeometry() };
 
-    qreal sW = screen.width() - screenReserve;
-    qreal sH = screen.height() - screenReserve;
+    qreal sW = screen.width() - tune::screen::reserve;
+    qreal sH = screen.height() - tune::screen::reserve;
 
     qreal wRatio { sW/w };
     qreal hRatio { sH/h };
-    if(wRatio < 1.0 || hRatio < 1.0) {
+    constexpr qreal orig {tune::zoom::origin};
+
+    if(wRatio < orig || hRatio < orig) {
         m_scaleFactor = std::min(wRatio, hRatio);
     } else {
-        m_scaleFactor = 1.0;
+        m_scaleFactor = orig;
     }
 }
 
@@ -307,7 +246,7 @@ void MainWindow::calcVideoFactor(const QSizeF &nativeSize)
 
 void MainWindow::applyImage()
 {
-    if(m_scaleFactor == 1.0) {
+    if(m_scaleFactor == tune::zoom::origin) {
         ui->label->setPixmap(QPixmap::fromImage(m_image));
     } else {
         ui->label->setPixmap(QPixmap::fromImage(m_image)
@@ -324,8 +263,8 @@ static void centerScrollArea(QScrollArea *area, QLabel* label)
 {
     auto screen { QApplication::desktop()->screenGeometry() };
     auto pixmap { label->pixmap() };
-    int w { (pixmap->width() - screen.width() + screenReserve)/2 };
-    int h { (pixmap->height() - screen.height() + screenReserve)/2 };
+    int w { (pixmap->width() - screen.width() + tune::screen::reserve)/2 };
+    int h { (pixmap->height() - screen.height() + tune::screen::reserve)/2 };
 
     area->horizontalScrollBar()->setValue(w);
     area->verticalScrollBar()->setValue(h);
@@ -337,24 +276,18 @@ bool MainWindow::zoom(Direction::type dir, ZoomType::type type)
         return false;
     }
 
-    static const qreal factors[2][2] {
-        { 0.07,  0.15},
-        {-0.07, -0.15},
-    };
-
-    qreal factor { factors[dir][type] };
+    qreal factor { tune::zoom::factors[dir][type] };
 
     qreal result { m_scaleFactor + factor };
-    if(result <= 0.0) {
+    if(result <= tune::zoom::min) {
         return false;
     }
 
-    if(result >= 4.0) {
+    if(result >= tune::zoom::max) {
         return false;
     }
 
-    const int zoomDelay {5}; //ms
-    if(m_zoomTimer.elapsed() > zoomDelay) {
+    if(m_zoomTimer.elapsed() > tune::zoom::delay) {
         m_scaleFactor = result;
 
         if(m_mode == MediaMode::Image) {
@@ -373,7 +306,7 @@ bool MainWindow::zoom(Direction::type dir, ZoomType::type type)
 void MainWindow::setMode(MediaMode::type type)
 {
     m_mode = type;
-    m_scaleFactor = 1.0;
+    m_scaleFactor = tune::zoom::origin;
     ui->codecErrorLabel->hide();
 
     if(m_mode == MediaMode::Video) {
@@ -394,7 +327,7 @@ static QFileInfoList getDirFiles(const QString &path)
 {
     QFileInfoList res;
 
-    QDirIterator it(path, QStringList() << supportedImages << supportedGif << supportedVideo, QDir::Files);
+    QDirIterator it(path, cap::supportedFormats(), QDir::Files);
     while(it.hasNext()) {
         it.next();
         res << it.fileInfo();
@@ -431,7 +364,11 @@ void MainWindow::videoRewind(Direction::type dir)
     auto position { m_videoPlayer.position() };
 
     const qreal percent = duration/100.;
-    const qreal step = dir == Direction::Forward ? 5*percent : -5*percent;
+    constexpr qreal speed {tune::video::rewind};
+    qreal step { speed*percent };
+    if(dir == Direction::Backward) {
+        step *= -1;
+    }
 
     position += step;
 
@@ -463,7 +400,7 @@ void MainWindow::showSliders()
     ui->progressSlider->show();
     ui->volumeSlider->show();
 
-    m_slidersTimer.start(2000);
+    m_slidersTimer.start(tune::slider::showTime);
 }
 
 void MainWindow::onClick()
@@ -478,9 +415,9 @@ void MainWindow::onClick()
 
     qreal rx { x/static_cast<qreal>(screenWidth) };
 
-    if(rx <= 1/5.) {
+    if(rx <= tune::screen::backwardSection) {
         gotoNextFile(Direction::Backward);
-    } else if(rx >= 4/5.) {
+    } else if(rx >= tune::screen::forwardSection) {
         gotoNextFile(Direction::Forward);
     }
 }
@@ -514,7 +451,7 @@ bool MainWindow::event(QEvent *event)
                 case Qt::Key_Minus: zoom(Direction::Backward, ZoomType::Button); return true;
                 case Qt::Key_Up: {
                     if(m_mode == MediaMode::Video) {
-                        ui->volumeSlider->setValue(ui->volumeSlider->value() + 4);
+                        ui->volumeSlider->setValue(ui->volumeSlider->value() + tune::volume::step);
                     } else {
                         zoom(Direction::Forward, ZoomType::Button); return true;
                     }
@@ -522,7 +459,7 @@ bool MainWindow::event(QEvent *event)
                 }
                 case Qt::Key_Down: {
                     if(m_mode == MediaMode::Video) {
-                        ui->volumeSlider->setValue(ui->volumeSlider->value() - 4);
+                        ui->volumeSlider->setValue(ui->volumeSlider->value() - tune::volume::step);
                     } else {
                         zoom(Direction::Backward, ZoomType::Button); return true;
                     }
@@ -539,7 +476,7 @@ bool MainWindow::event(QEvent *event)
                         calcImageFactor();
                         applyImage();
                     } else if(m_mode == MediaMode::Gif) {
-                        m_scaleFactor = 1.0;
+                        m_scaleFactor = tune::zoom::origin;
                         applyGif();
                     }
                     return true;
@@ -551,7 +488,7 @@ bool MainWindow::event(QEvent *event)
                         calcImageFactor();
                         applyImage();
                     } else if(m_mode == MediaMode::Gif) {
-                        m_scaleFactor = 1.0;
+                        m_scaleFactor = tune::zoom::origin;
                         applyGif();
                     }
                     return true;
@@ -565,7 +502,7 @@ bool MainWindow::event(QEvent *event)
 
             if(m_mode == MediaMode::Video) {
                 int val { ui->volumeSlider->value() };
-                ui->volumeSlider->setValue(val + wheelEvent->angleDelta().y()/15.0);
+                ui->volumeSlider->setValue(val + wheelEvent->angleDelta().y()/tune::volume::wheelAngleDivider);
             } else {
                 Direction::type dir { wheelEvent->delta() > 0 ? Direction::Forward : Direction::Backward };
                 zoom(dir, ZoomType::Wheel);
