@@ -7,31 +7,32 @@
 #include <QMediaPlayer>
 #include <QGraphicsVideoItem>
 #include <QMovie>
-#include <QDir>
+#include <QFileInfo>
 
 namespace Ui {
 class MainWindow;
 }
 
-#define enum_class(x) class x { public: enum type
-#define enum_interface };
-#define enum_end ;}
+namespace pork {
 
-enum_class(ZoomType) {
+enum InputType
+{
     Button = 0,
     Wheel
-} enum_end;
+};
 
-enum_class(Direction) {
-    Forward = 0,
-    Backward
-} enum_end;
+enum Direction
+{
+    Backward = 0,
+    Forward,
+};
 
-enum_class(MediaMode) {
+enum MediaMode
+{
     Image = 0,
     Gif,
     Video
-} enum_end;
+};
 
 class MainWindow : public QMainWindow
 {
@@ -41,7 +42,9 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
-public slots:
+public:
+    void setupVideoPlayer();
+
     bool openFile(const QString &fileName);
     bool loadFile();
     bool loadImage();
@@ -49,28 +52,30 @@ public slots:
     bool loadVideo();
     void calcImageFactor();
     void calcVideoFactor(const QSizeF &nativeSize);
+    void resetScale();
     void applyImage();
     void applyGif();
-    void gotoNextFile(Direction::type dir);
-    void videoRewind(Direction::type dir);
+    void gotoNextFile(Direction dir);
+    void videoRewind(Direction dir);
     bool dragImage(QPoint p);
     void showSliders();
 
-    bool zoom(Direction::type dir, ZoomType::type type);
-    void setMode(MediaMode::type type);
+    bool zoom(Direction dir, InputType type);
+    bool volumeStep(Direction dir, InputType type);
+    void setMode(MediaMode type);
 
     void onClick();
 
 protected:
     virtual void resizeEvent(QResizeEvent *event) override;
     virtual bool event(QEvent *event) override;
-    virtual void dragEnterEvent(QDragEnterEvent *) override;
-    virtual void dropEvent(QDropEvent *) override;
+    virtual void dragEnterEvent(QDragEnterEvent *event) override;
+    virtual void dropEvent(QDropEvent *event) override;
 
 private:
     Ui::MainWindow *ui;
 
-    MediaMode::type m_mode { MediaMode::Image };
+    MediaMode m_mode { MediaMode::Image };
     QFileInfo m_currentFile;
 
     QImage m_image;
@@ -86,5 +91,7 @@ private:
     bool m_mouseDraging { false };
     bool m_userChangedVideoPos { false };
 };
+
+} // namespace pork
 
 #endif // MAINWINDOW_H

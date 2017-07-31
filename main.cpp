@@ -6,7 +6,7 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     a.setApplicationName("Pork");
 
-    MainWindow w;
+    pork::MainWindow w;
     w.show();
 
     return a.exec();

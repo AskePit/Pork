@@ -1,7 +1,15 @@
 #include "utils.h"
+#include "config.h"
 
-#include <QAbstractScrollArea>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QEvent>
+#include <QDirIterator>
+#include <QApplication>
+#include <QDesktopWidget>
+#include <QLabel>
+
+namespace pork {
 
 int QSliderStyle::styleHint(QStyle::StyleHint hint, const QStyleOption *option, const QWidget *widget, QStyleHintReturn *returnData) const
 {
@@ -47,3 +55,33 @@ bool fileBelongsTo(const QString &file, const QStringList &list)
     }
     return false;
 }
+
+QFileInfoList getDirFiles(const QString &path)
+{
+    QFileInfoList res;
+
+    QDirIterator it(path, cap::supportedFormats(), QDir::Files);
+    while(it.hasNext()) {
+        it.next();
+        res << it.fileInfo();
+    }
+    return res;
+}
+
+QRect screen()
+{
+    return QApplication::desktop()->screenGeometry();
+}
+
+void centerScrollArea(QScrollArea *area, QLabel* label)
+{
+    auto screen { QApplication::desktop()->screenGeometry() };
+    auto pixmap { label->pixmap() };
+    int w { (pixmap->width() - screen.width() + tune::screen::reserve)/2 };
+    int h { (pixmap->height() - screen.height() + tune::screen::reserve)/2 };
+
+    area->horizontalScrollBar()->setValue(w);
+    area->verticalScrollBar()->setValue(h);
+}
+
+} // namespace pork
