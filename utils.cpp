@@ -45,6 +45,13 @@ void block(QAbstractScrollArea *w) {
     w->viewport()->installEventFilter(blocker);
 }
 
+void block(QWidget *w) {
+    if(!blocker) {
+        blocker = new Blocker;
+    }
+    w->installEventFilter(blocker);
+}
+
 bool fileBelongsTo(const QString &file, const QStringList &list)
 {
     for(const auto &ext : list) {

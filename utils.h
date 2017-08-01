@@ -27,6 +27,7 @@ public:
 };
 
 void block(QAbstractScrollArea *w);
+void block(QWidget *w);
 
 bool fileBelongsTo(const QString &file, const QStringList &list);
 QFileInfoList getDirFiles(const QString &path);

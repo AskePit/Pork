@@ -4,26 +4,32 @@
 #include "config.h"
 #include "utils.h"
 
+#include <VLCQtCore/Common.h>
+#include <VLCQtCore/Media.h>
+#include <VLCQtCore/Video.h>
+#include <VLCQtCore/Audio.h>
+
 #include <QMessageBox>
 #include <QDropEvent>
 #include <QMimeData>
 #include <QDir>
 #include <QScrollBar>
 #include <QDebug>
-#include <functional>
 
 namespace pork {
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , m_videoPlayer(this)
+    , m_vlcInstance(VlcCommon::args(), this)
+    , m_videoPlayer(&m_vlcInstance)
 {
     ui->setupUi(this);
+
     setupVideoPlayer();
 
     block(ui->scrollArea);
-    block(ui->videoView);
+    block(ui->videoPane);
 
     setMediaMode(MediaMode::Image);
     setAppMode(AppMode::DragDialog);
@@ -32,47 +38,46 @@ MainWindow::MainWindow(QWidget *parent)
 void MainWindow::setupVideoPlayer()
 {
     // basic setup
-    m_videoPlayer.setVideoOutput(&m_graphicsItem);
-    ui->videoView->setScene(new QGraphicsScene);
-    ui->videoView->scene()->addItem(&m_graphicsItem);
+    m_videoPlayer.setVideoWidget(ui->videoView);
 
     // make sliders well-responsible
     ui->volumeSlider->setStyle(new QSliderStyle(ui->volumeSlider->style()));
     ui->progressSlider->setStyle(new QSliderStyle(ui->progressSlider->style()));
 
+
     // video volume change
     ui->volumeSlider->setRange(tune::volume::min, tune::volume::max);
-    connect(ui->volumeSlider, &QSlider::valueChanged, [this](int volume){
-        m_videoPlayer.setVolume(volume);
+    connect(ui->volumeSlider, &QSlider::valueChanged, [this](int volume) {
+        if(m_vlcAudio) {
+            m_vlcAudio->setVolume(volume);
+        }
         showSliders();
     });
 
     // video duration change
-    connect(&m_videoPlayer, &QMediaPlayer::durationChanged, ui->progressSlider, &QSlider::setMaximum);
+    ui->volumeSlider->setRange(0, 100);
 
     // video position change
-    connect(&m_videoPlayer, &QMediaPlayer::positionChanged, [this](quint64 position) {
+    connect(&m_videoPlayer, &VlcMediaPlayer::positionChanged, [this](float position) {
         if(m_userChangedVideoPos) {
             showSliders();
             m_userChangedVideoPos = false;
         } else {
-            ui->progressSlider->setValue(position);
+            ui->progressSlider->setValue(position*100);
         }
     });
     connect(ui->progressSlider, &QSlider::sliderReleased, [this]() {
         m_userChangedVideoPos = true;
-        m_videoPlayer.setPosition(ui->progressSlider->value());
-        if(m_videoPlayer.state() == QMediaPlayer::StoppedState) {
+        m_videoPlayer.setPosition(ui->progressSlider->value()/100.);
+        if(m_videoPlayer.state() == Vlc::Stopped) {
             m_videoPlayer.play();
         }
     });
 
-    // resize video
-    connect(&m_graphicsItem, &QGraphicsVideoItem::nativeSizeChanged, this, &MainWindow::calcVideoFactor);
-
     // unknown codec case
-    connect(&m_videoPlayer, &QMediaPlayer::mediaStatusChanged, [this](QMediaPlayer::MediaStatus status){
-        if(status == QMediaPlayer::InvalidMedia) {
+    connect(&m_videoPlayer, &VlcMediaPlayer::stateChanged, [this]() {
+        auto state = m_videoPlayer.state();
+        if(state == Vlc::Error) {
             ui->codecErrorLabel->show();
             ui->volumeSlider->hide();
             ui->progressSlider->hide();
@@ -88,6 +93,7 @@ void MainWindow::setupVideoPlayer()
 MainWindow::~MainWindow()
 {
     delete ui;
+    delete m_vlcMedia;
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event)
@@ -152,7 +158,7 @@ void MainWindow::setAppMode(AppMode type)
         setMediaMode(MediaMode::Image);
         ui->label->clear();
         showNormal();
-        ui->label->setText(tr("<html><head/><body><p><span style=\" color:#676767;\">Drag image/video here...</span></p></body></html>"));
+        ui->label->setText(QString("<span style=\" color:#676767;\">%1</span>").arg(tr("Drag image/video here...")));
     }
 }
 
@@ -227,11 +233,14 @@ bool MainWindow::loadVideo()
     QString filePath { m_currentFile.absoluteFilePath() };
 
     setMediaMode(MediaMode::Video);
-    m_videoPlayer.setMedia(QUrl{filePath});
-    m_videoPlayer.setVolume(tune::volume::min);
-    ui->volumeSlider->setValue(0);
 
-    m_videoPlayer.play();
+    m_vlcMedia = new VlcMedia(filePath, true, &m_vlcInstance);
+    m_videoPlayer.open(m_vlcMedia);
+    m_vlcAudio = m_videoPlayer.audio();
+    if(m_vlcAudio) {
+        m_vlcAudio->setVolume(0);
+    }
+    QTimer::singleShot(200, [this](){calcVideoFactor(m_videoPlayer.video()->size());});
 
     return true;
 }
@@ -245,12 +254,12 @@ void MainWindow::setMediaMode(MediaMode type)
 
     if(m_mediaMode == MediaMode::Video) {
         ui->label->hide();
-        ui->videoView->show();
+        ui->videoPane->show();
         showSliders();
         m_zoomTimer.invalidate();
     } else {
         ui->label->show();
-        ui->videoView->hide();
+        ui->videoPane->hide();
         m_videoPlayer.stop();
         m_gifPlayer.stop();
         m_zoomTimer.start();
@@ -277,21 +286,27 @@ void MainWindow::calcImageFactor()
 }
 
 void MainWindow::calcVideoFactor(const QSizeF &nativeSize)
-{
+{   
     QSize screenSize { size() };
+
+    QSizeF s;
 
     bool nativeFits { nativeSize.boundedTo(screenSize) == nativeSize };
     if(nativeFits) {
-        m_graphicsItem.setSize(nativeSize);
+        s = nativeSize;
     } else {
-        m_graphicsItem.setSize(nativeSize.scaled(screenSize, Qt::KeepAspectRatio));
+        s = nativeSize.scaled(screenSize, Qt::KeepAspectRatio);
     }
 
-    QPoint pos { rect().center() };
-    QSizeF viewSize { m_graphicsItem.size() };
-    pos.rx() -= viewSize.width()/2.;
-    pos.ry() -= viewSize.height()/2.;
-    m_graphicsItem.setPos(pos);
+    QPointF pos { rect().center() };
+    pos.rx() -= s.width()/2.;
+    pos.ry() -= s.height()/2.;
+
+    QRectF geom(pos, s);
+
+    ui->videoView->setGeometry(geom.toRect());
+    ui->videoView->setMaximumSize(geom.size().toSize());
+    ui->videoView->setMinimumSize(geom.size().toSize());
 }
 
 void MainWindow::resetScale()
@@ -357,8 +372,8 @@ bool MainWindow::volumeStep(Direction dir, InputType type)
 {
     int value {ui->volumeSlider->value()};
 
-    if(value == tune::volume::min && dir == Direction::Backward
-    || value == tune::volume::max && dir == Direction::Forward) {
+    if((value == tune::volume::min && dir == Direction::Backward)
+    || (value == tune::volume::max && dir == Direction::Forward)) {
         return false;
     }
 
@@ -394,19 +409,12 @@ void MainWindow::videoRewind(Direction dir)
 {
     m_userChangedVideoPos = true;
 
-    auto duration { m_videoPlayer.duration() };
-    auto position { m_videoPlayer.position() };
-
-    const qreal percent = duration/100.;
-    constexpr qreal speed {tune::video::rewind};
-    qreal step { speed*percent };
+    qreal step { tune::video::rewind };
     if(dir == Direction::Backward) {
         step *= -1;
     }
 
-    position += step;
-
-    m_videoPlayer.setPosition(position);
+    m_videoPlayer.setPosition(m_videoPlayer.position() + step);
 }
 
 bool MainWindow::dragImage(QPoint p)
@@ -478,9 +486,6 @@ bool MainWindow::event(QEvent *event)
 
             auto rewindOrGotoNext = std::bind(videoMode && ctrl ? &MainWindow::videoRewind : &MainWindow::gotoNextFile, this, _1);
 
-            bool paused = m_videoPlayer.state() == QMediaPlayer::StoppedState || m_videoPlayer.state() == QMediaPlayer::PausedState;
-            auto videoPlayPause = std::bind(paused ? &QMediaPlayer::play : &QMediaPlayer::pause, &m_videoPlayer);
-
             switch(key) {
                 case Qt::Key_Escape: setAppMode(AppMode::DragDialog); return true;
                 case Qt::Key_Left:   rewindOrGotoNext(Direction::Backward); return true;
@@ -489,7 +494,7 @@ bool MainWindow::event(QEvent *event)
                 case Qt::Key_Up:     zoomOrVolumeStep(Direction::Forward, InputType::Button); return true;
                 case Qt::Key_Minus:
                 case Qt::Key_Down:   zoomOrVolumeStep(Direction::Backward, InputType::Button); return true;
-                case Qt::Key_Space:  videoMode ? videoPlayPause() : resetScale(); return true;
+                case Qt::Key_Space:  videoMode ? m_videoPlayer.togglePause() : resetScale(); return true;
                 case Qt::Key_Return: resetScale(); return true;
                 default: break;
             }

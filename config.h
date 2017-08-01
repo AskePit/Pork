@@ -48,7 +48,7 @@ namespace tune
 
     namespace video
     {
-        constexpr qreal rewind {5.0};  //! rewind speed
+        constexpr qreal rewind {0.05};  //! rewind speed
     }
 
     namespace volume

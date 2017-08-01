@@ -3,15 +3,17 @@
 
 #include <QMainWindow>
 #include <QElapsedTimer>
-#include <QTimer>
-#include <QMediaPlayer>
-#include <QGraphicsVideoItem>
 #include <QMovie>
 #include <QFileInfo>
+
+#include <VLCQtCore/Instance.h>
+#include <VLCQtCore/MediaPlayer.h>
 
 namespace Ui {
 class MainWindow;
 }
+
+class VlcMedia;
 
 namespace pork {
 
@@ -91,8 +93,10 @@ private:
 
     QImage m_image;
     QMovie m_gifPlayer;
-    QMediaPlayer m_videoPlayer;
-    QGraphicsVideoItem m_graphicsItem;
+    VlcInstance m_vlcInstance;
+    VlcMediaPlayer m_videoPlayer;
+    VlcMedia *m_vlcMedia {nullptr};
+    VlcAudio *m_vlcAudio {nullptr};
 
     QSize m_gifOriginalSize;
     qreal m_scaleFactor { 1.0 };
