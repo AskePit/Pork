@@ -91,4 +91,26 @@ void centerScrollArea(QScrollArea *area, QLabel* label)
     area->verticalScrollBar()->setValue(h);
 }
 
+QString toString(QRgb color)
+{
+    return QColor{color}.name();
+}
+
+void setLabelText(QLabel *label, const QString &text, QRgb color, int fontSize, bool bold)
+{
+    label->setText(QString("<span style=\" color:%2;\">%1</span>").arg(text, toString(color)));
+    if(fontSize == -1 && !bold) {
+        return;
+    }
+
+    const QFont &font {label->font()};
+    if(font.pointSize() != fontSize || font.bold() != bold) {
+        QFont newFont {font};
+        newFont.setPointSize(fontSize);
+        newFont.setBold(bold);
+        label->setFont(newFont);
+    }
+
+}
+
 } // namespace pork

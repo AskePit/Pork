@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 #include <QMovie>
 #include <QFileInfo>
+#include <QSettings>
 
 #include <VLCQtCore/Instance.h>
 #include <VLCQtCore/MediaPlayer.h>
@@ -61,6 +62,7 @@ public:
     bool loadImage();
     bool loadGif();
     bool loadVideo();
+    bool reloadVideo();
     void calcImageFactor();
     void calcVideoFactor(const QSizeF &nativeSize);
     void resetScale();
@@ -74,6 +76,8 @@ public:
     bool zoom(Direction dir, InputType type);
     bool volumeStep(Direction dir, InputType type);
 
+    void resumeVideo();
+    void toggleVideo();
 
     void onClick();
 
@@ -85,6 +89,8 @@ protected:
 
 private:
     Ui::MainWindow *ui;
+
+    QSettings m_settings;
 
     MediaMode m_mediaMode { MediaMode::Image };
     AppMode m_appMode { AppMode::DragDialog };
@@ -102,6 +108,7 @@ private:
     qreal m_scaleFactor { 1.0 };
     QElapsedTimer m_zoomTimer;
     QTimer m_slidersTimer;
+    QTimer m_fileNameTimer;
     QPoint m_clickPoint;
     bool m_mouseDraging { false };
     bool m_userChangedVideoPos { false };

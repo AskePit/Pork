@@ -15,24 +15,37 @@
 #include <QDir>
 #include <QScrollBar>
 #include <QDebug>
+#include <functional>
 
 namespace pork {
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
+    , m_settings("PitM", "Pork")
     , m_vlcInstance(VlcCommon::args(), this)
     , m_videoPlayer(&m_vlcInstance)
 {
     ui->setupUi(this);
+    ui->fileNameLabel->setContentsMargins(tune::info::fileName::pad, tune::info::fileName::pad, 0, 0);
 
     setupVideoPlayer();
 
     block(ui->scrollArea);
     block(ui->videoPane);
 
+    m_fileNameTimer.setSingleShot(true);
+    connect(&m_fileNameTimer, &QTimer::timeout, ui->fileNameLabel, &QLabel::hide);
+
     setMediaMode(MediaMode::Image);
     setAppMode(AppMode::DragDialog);
+
+    restoreGeometry(m_settings.value(tune::reg::dragWindowGeometry).toByteArray());
+    connect(qApp, &QApplication::aboutToQuit, [this]() {
+        if(m_appMode == AppMode::DragDialog) {
+            m_settings.setValue(tune::reg::dragWindowGeometry, saveGeometry());
+        }
+    });
 }
 
 void MainWindow::setupVideoPlayer()
@@ -66,17 +79,19 @@ void MainWindow::setupVideoPlayer()
             ui->progressSlider->setValue(position*100);
         }
     });
+    connect(ui->progressSlider, &QSlider::sliderPressed, [this]() {
+        m_userChangedVideoPos = true;
+        m_videoPlayer.pause();
+    });
     connect(ui->progressSlider, &QSlider::sliderReleased, [this]() {
         m_userChangedVideoPos = true;
         m_videoPlayer.setPosition(ui->progressSlider->value()/100.);
-        if(m_videoPlayer.state() == Vlc::Stopped) {
-            m_videoPlayer.play();
-        }
+        resumeVideo();
     });
 
-    // unknown codec case
     connect(&m_videoPlayer, &VlcMediaPlayer::stateChanged, [this]() {
         auto state = m_videoPlayer.state();
+        // unknown codec case
         if(state == Vlc::Error) {
             ui->codecErrorLabel->show();
             ui->volumeSlider->hide();
@@ -147,6 +162,8 @@ void MainWindow::resizeEvent(QResizeEvent *event)
     ui->codecErrorLabel->setGeometry(label);
     ui->volumeSlider->setGeometry(volume);
     ui->progressSlider->setGeometry(progress);
+
+    ui->fileNameLabel->resize(window.width(), tune::info::fileName::fontSize*2 + tune::info::fileName::pad);
 }
 
 void MainWindow::setAppMode(AppMode type)
@@ -154,11 +171,13 @@ void MainWindow::setAppMode(AppMode type)
     m_appMode = type;
     if(type == AppMode::Fullscreen) {
         showFullScreen();
+        ui->fileNameLabel->show();
     } else {
         setMediaMode(MediaMode::Image);
         ui->label->clear();
         showNormal();
-        ui->label->setText(QString("<span style=\" color:#676767;\">%1</span>").arg(tr("Drag image/video here...")));
+        setLabelText(ui->label, tr("Drag image/video here..."), tune::info::dragLabelColor);
+        ui->fileNameLabel->hide();
     }
 }
 
@@ -211,12 +230,19 @@ bool MainWindow::loadImage()
     calcImageFactor();
     applyImage();
 
+    setLabelText(ui->fileNameLabel, m_currentFile.fileName(), tune::info::fileName::darkColor, tune::info::fileName::fontSize);
+    ui->fileNameLabel->show();
+    m_fileNameTimer.start(tune::info::fileName::showTime);
+
     return true;
 }
 
 bool MainWindow::loadGif()
 {
     QString filePath { m_currentFile.absoluteFilePath() };
+    setLabelText(ui->fileNameLabel, m_currentFile.fileName(), tune::info::fileName::darkColor, tune::info::fileName::fontSize);
+    ui->fileNameLabel->show();
+    m_fileNameTimer.start(tune::info::fileName::showTime);
 
     setMediaMode(MediaMode::Gif);
     m_gifPlayer.setFileName(filePath);
@@ -231,16 +257,36 @@ bool MainWindow::loadGif()
 bool MainWindow::loadVideo()
 {
     QString filePath { m_currentFile.absoluteFilePath() };
+    setLabelText(ui->fileNameLabel, m_currentFile.fileName(), tune::info::fileName::lightColor, tune::info::fileName::fontSize, true);
+    ui->fileNameLabel->show();
+    m_fileNameTimer.start(tune::info::fileName::showTime);
 
     setMediaMode(MediaMode::Video);
 
+    if(m_vlcMedia) {
+        delete m_vlcMedia;
+    }
     m_vlcMedia = new VlcMedia(filePath, true, &m_vlcInstance);
     m_videoPlayer.open(m_vlcMedia);
     m_vlcAudio = m_videoPlayer.audio();
     if(m_vlcAudio) {
         m_vlcAudio->setVolume(0);
     }
-    QTimer::singleShot(200, [this](){calcVideoFactor(m_videoPlayer.video()->size());});
+    QTimer::singleShot(300, [this](){calcVideoFactor(m_videoPlayer.video()->size());});
+
+    return true;
+}
+
+bool MainWindow::reloadVideo()
+{
+    QString filePath { m_currentFile.absoluteFilePath() };
+
+    if(m_vlcMedia) {
+        delete m_vlcMedia;
+    }
+    m_vlcMedia = new VlcMedia(filePath, true, &m_vlcInstance);
+    m_videoPlayer.open(m_vlcMedia);
+    m_vlcAudio = m_videoPlayer.audio();
 
     return true;
 }
@@ -249,6 +295,7 @@ void MainWindow::setMediaMode(MediaMode type)
 {
     m_mediaMode = type;
     m_scaleFactor = tune::zoom::origin;
+    ui->progressSlider->setValue(0);
     ui->codecErrorLabel->hide();
     ui->label->clear();
 
@@ -258,10 +305,10 @@ void MainWindow::setMediaMode(MediaMode type)
         showSliders();
         m_zoomTimer.invalidate();
     } else {
-        ui->label->show();
-        ui->videoPane->hide();
         m_videoPlayer.stop();
         m_gifPlayer.stop();
+        ui->videoPane->hide();
+        ui->label->show();
         m_zoomTimer.start();
     }
 }
@@ -445,6 +492,27 @@ void MainWindow::showSliders()
     m_slidersTimer.start(tune::slider::showTime);
 }
 
+void MainWindow::resumeVideo()
+{
+    auto state = m_videoPlayer.state();
+    if(state == Vlc::Paused) {
+        m_videoPlayer.resume();
+    } else if(state == Vlc::Ended) {
+        m_videoPlayer.setPosition(0);
+        m_videoPlayer.play();
+    }
+}
+
+void MainWindow::toggleVideo()
+{
+    auto state = m_videoPlayer.state();
+    if(state == Vlc::Paused || state == Vlc::Playing) {
+        m_videoPlayer.togglePause();
+    } else if(state == Vlc::Ended) {
+        reloadVideo();
+    }
+}
+
 void MainWindow::onClick()
 {
     QWidget *w { ui->videoView->childAt(m_clickPoint) };
@@ -494,7 +562,7 @@ bool MainWindow::event(QEvent *event)
                 case Qt::Key_Up:     zoomOrVolumeStep(Direction::Forward, InputType::Button); return true;
                 case Qt::Key_Minus:
                 case Qt::Key_Down:   zoomOrVolumeStep(Direction::Backward, InputType::Button); return true;
-                case Qt::Key_Space:  videoMode ? m_videoPlayer.togglePause() : resetScale(); return true;
+                case Qt::Key_Space:  videoMode ? toggleVideo() : resetScale(); return true;
                 case Qt::Key_Return: resetScale(); return true;
                 default: break;
             }
