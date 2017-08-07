@@ -10,7 +10,7 @@ namespace cap
 {
     const QStringList supportedImages { "*.jpg", "*.jpeg", "*.png", "*.bmp" };
     const QStringList supportedGif { "*.gif" };
-    const QStringList supportedVideo { "*.webm", "*.wmv", "*.mp4", "*.mpg" };
+    const QStringList supportedVideo { "*.3gp", "*.webm", "*.wmv", "*.mp4", "*.mpg", "*.asf", "*.dvr-ms", "*.flv", "*.f4v", "*.mkv", "*.mov", "*.qt", "*.m4v", "*.ogg", "*.ogv", "*.ts", "*.tsv", "*.mpeg", "*.vob", "*.rm"};
     inline const QStringList supportedFormats() {
         return QStringList() << supportedImages << supportedGif << supportedVideo;
     }
@@ -27,8 +27,8 @@ namespace tune
     namespace screen
     {
         constexpr int reserve {2};              //! image padding from screen border to prevent scroll bars appearance
-        constexpr qreal backwardSection {1/5.}; //! x of screen area where mouse click is treated as a previous file request
-        constexpr qreal forwardSection {4/5.};  //! x of screen area where mouse click is treated as a next file request
+        constexpr qreal backwardSection {1/6.}; //! x of screen area where mouse click is treated as a previous file request
+        constexpr qreal forwardSection {5/6.};  //! x of screen area where mouse click is treated as a next file request
     }
 
     namespace slider
@@ -55,6 +55,7 @@ namespace tune
 
     namespace video
     {
+        constexpr int bufferingTime {400}; //! aproximate time to buffer video
         constexpr qreal rewind {0.05};  //! rewind speed
     }
 

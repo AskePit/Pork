@@ -1,14 +1,13 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "videoplayer.h"
+
 #include <QMainWindow>
 #include <QElapsedTimer>
 #include <QMovie>
 #include <QFileInfo>
 #include <QSettings>
-
-#include <VLCQtCore/Instance.h>
-#include <VLCQtCore/MediaPlayer.h>
 
 namespace Ui {
 class MainWindow;
@@ -30,12 +29,6 @@ enum InputType
     Wheel
 };
 
-enum Direction
-{
-    Backward = 0,
-    Forward,
-};
-
 enum MediaMode
 {
     Image = 0,
@@ -52,8 +45,6 @@ public:
     ~MainWindow();
 
 public:
-    void setupVideoPlayer();
-
     void setAppMode(AppMode type);
     void setMediaMode(MediaMode type);
 
@@ -62,22 +53,17 @@ public:
     bool loadImage();
     bool loadGif();
     bool loadVideo();
-    bool reloadVideo();
     void calcImageFactor();
     void calcVideoFactor(const QSizeF &nativeSize);
     void resetScale();
     void applyImage();
     void applyGif();
     void gotoNextFile(Direction dir);
-    void videoRewind(Direction dir);
     bool dragImage(QPoint p);
-    void showSliders();
 
+    void videoRewind(Direction dir);
     bool zoom(Direction dir, InputType type);
     bool volumeStep(Direction dir, InputType type);
-
-    void resumeVideo();
-    void toggleVideo();
 
     void onClick();
 
@@ -99,19 +85,14 @@ private:
 
     QImage m_image;
     QMovie m_gifPlayer;
-    VlcInstance m_vlcInstance;
-    VlcMediaPlayer m_videoPlayer;
-    VlcMedia *m_vlcMedia {nullptr};
-    VlcAudio *m_vlcAudio {nullptr};
+    VideoPlayer m_videoPlayer;
 
     QSize m_gifOriginalSize;
     qreal m_scaleFactor { 1.0 };
     QElapsedTimer m_zoomTimer;
-    QTimer m_slidersTimer;
     QTimer m_fileNameTimer;
     QPoint m_clickPoint;
     bool m_mouseDraging { false };
-    bool m_userChangedVideoPos { false };
 };
 
 } // namespace pork
