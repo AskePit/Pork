@@ -13,8 +13,10 @@ class QLabel;
 namespace pork
 {
 
-class VideoPlayer
+class VideoPlayer : public QObject
 {
+    Q_OBJECT
+
 public:
     VideoPlayer(QWidget *parent = 0);
     void setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *volume, QLabel *codecErrorLabel);
@@ -31,6 +33,9 @@ public:
 
     const QSizeF size();
 
+signals:
+    void loaded();
+
 private:
     VlcInstance m_vlc;
     VlcMediaPlayer m_player;
@@ -45,6 +50,7 @@ private:
     QString m_currentFile;
     QTimer m_slidersTimer;
     bool m_userChangedVideoPos {false};
+    bool m_firstLoad {true};
 };
 
 } // namespace pork

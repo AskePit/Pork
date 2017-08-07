@@ -36,7 +36,7 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
 
     // video volume change
     m_volumeSlider->setRange(tune::volume::min, tune::volume::max);
-    QObject::connect(m_volumeSlider, &QSlider::valueChanged, [this](int volume) {
+    connect(m_volumeSlider, &QSlider::valueChanged, [this](int volume) {
         if(m_audio) {
             m_audio->setVolume(volume);
         }
@@ -44,7 +44,15 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
     });
 
     // video position change
-    QObject::connect(&m_player, &VlcMediaPlayer::positionChanged, [this](float position) {
+    connect(&m_player, &VlcMediaPlayer::positionChanged, [this](float position) {
+        // first video load resulted in 100 volume anyway. this is a workaround.
+        if(m_firstLoad) {
+            m_firstLoad = false;
+            if(m_audio) {
+                m_audio->setVolume(0);
+            }
+        }
+
         if(m_userChangedVideoPos) {
             showSliders();
             m_userChangedVideoPos = false;
@@ -52,33 +60,35 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
             m_progressSlider->setValue(position*100);
         }
     });
-    QObject::connect(m_progressSlider, &QSlider::sliderPressed, [this]() {
+    connect(m_progressSlider, &QSlider::sliderPressed, [this]() {
         m_userChangedVideoPos = true;
         m_player.pause();
     });
-    QObject::connect(m_progressSlider, &QSlider::sliderReleased, [this]() {
+    connect(m_progressSlider, &QSlider::sliderReleased, [this]() {
         m_userChangedVideoPos = true;
         m_player.setPosition(m_progressSlider->value()/100.);
         resume();
     });
 
-    QObject::connect(&m_player, &VlcMediaPlayer::stateChanged, [this]() {
+    connect(&m_player, &VlcMediaPlayer::stateChanged, [this]() {
         auto state = m_player.state();
-        qDebug() << state;
         // unknown codec case
         if(state == Vlc::Error) {
             m_codecErrorLabel->show();
             m_volumeSlider->hide();
             m_progressSlider->hide();
-        } else if (state == Vlc::Playing){
-            qDebug() << "PLAYING!!";
         }
+    });
+
+    connect(&m_player, &VlcMediaPlayer::vout, [this](int count) {
+        Q_UNUSED(count);
+        emit loaded();
     });
 
     // sliders auto-hide
     m_slidersTimer.setSingleShot(true);
-    QObject::connect(&m_slidersTimer, &QTimer::timeout, m_progressSlider, &QSlider::hide);
-    QObject::connect(&m_slidersTimer, &QTimer::timeout, m_volumeSlider, &QSlider::hide);
+    connect(&m_slidersTimer, &QTimer::timeout, m_progressSlider, &QSlider::hide);
+    connect(&m_slidersTimer, &QTimer::timeout, m_volumeSlider, &QSlider::hide);
 }
 
 bool VideoPlayer::load(const QString &file)
@@ -86,10 +96,6 @@ bool VideoPlayer::load(const QString &file)
     m_currentFile = file;
 
     reload();
-    if(m_audio) {
-        qDebug() << "try change to 0";
-        m_audio->setVolume(0);
-    }
 
     return true;
 }
@@ -103,13 +109,6 @@ bool VideoPlayer::reload()
     m_player.open(m_media);
     m_player.play();
     m_audio = m_player.audio();
-
-    /*QObject::connect(m_audio, &VlcAudio::volumeChanged, [this](int v){
-        qDebug() << "VOLUME" << v;
-        if(v == 100) {
-            m_audio->setVolume(0);
-        }
-    });*/
 
     showSliders();
 

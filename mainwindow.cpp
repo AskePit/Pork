@@ -22,6 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     m_videoPlayer.setWidgets(ui->videoView, ui->progressSlider, ui->volumeSlider, ui->codecErrorLabel);
+    connect(&m_videoPlayer, &VideoPlayer::loaded, [this](){calcVideoFactor(m_videoPlayer.size());});
     ui->fileNameLabel->setContentsMargins(tune::info::fileName::pad, tune::info::fileName::pad, 0, 0);
 
     block(ui->scrollArea);
@@ -205,7 +206,7 @@ bool MainWindow::loadVideo()
     m_videoPlayer.load(filePath);
 
     qDebug() << "load complete";
-    QTimer::singleShot(tune::video::bufferingTime, [this](){qDebug() << "CALC!!"; calcVideoFactor(m_videoPlayer.size());});
+    //QTimer::singleShot(tune::video::bufferingTime, [this](){qDebug() << "CALC!!"; calcVideoFactor(m_videoPlayer.size());});
 
     return true;
 }
