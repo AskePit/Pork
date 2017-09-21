@@ -10,7 +10,7 @@ namespace cap
 {
     const QStringList supportedImages { "*.jpg", "*.jpeg", "*.png", "*.bmp" };
     const QStringList supportedGif { "*.gif" };
-    const QStringList supportedVideo { "*.3gp", "*.webm", "*.wmv", "*.mp4", "*.mpg", "*.asf", "*.dvr-ms", "*.flv", "*.f4v", "*.mkv", "*.mov", "*.qt", "*.m4v", "*.ogg", "*.ogv", "*.ts", "*.tsv", "*.mpeg", "*.vob", "*.rm"};
+    const QStringList supportedVideo { "*.avi", "*.3gp", "*.webm", "*.wmv", "*.mp4", "*.mpg", "*.asf", "*.dvr-ms", "*.flv", "*.f4v", "*.mkv", "*.mov", "*.qt", "*.m4v", "*.ogg", "*.ogv", "*.ts", "*.tsv", "*.mpeg", "*.vob", "*.rm" };
     inline const QStringList supportedFormats() {
         return QStringList() << supportedImages << supportedGif << supportedVideo;
     }
