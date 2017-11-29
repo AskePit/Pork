@@ -1,8 +1,7 @@
 #ifndef VIDEOPLAYER_H
 #define VIDEOPLAYER_H
 
-#include "utils.h"
-#include <QFrame>
+#include <QWidget>
 #include <QTimer>
 #include <vlc/libvlc.h>
 #include <vlc_common.h>
@@ -28,14 +27,6 @@ public:
     WId window();
 };
 
-//! This makes QSliders set their position strictly to the pointed position instead of stepping
-class QSliderStyle : public QProxyStyle
-{
-public:
-    using QProxyStyle::QProxyStyle;
-    virtual int styleHint(QStyle::StyleHint hint, const QStyleOption *option = 0, const QWidget *widget = 0, QStyleHintReturn *returnData = 0) const override;
-};
-
 class VideoPlayer : public QObject
 {
     Q_OBJECT
@@ -52,16 +43,13 @@ public:
     void setWidgets(VideoView *view, QSlider *progress, QSlider *volume, QLabel *codecErrorLabel);
 
     bool load(const QString &file);
-    bool reload();
-
-    void open();
     void play();
+    void replay();
     void rewind(Direction dir, qreal step);
     void pause();
     void resume();
     void toggle();
     void stop();
-    void showSliders();
 
     libvlc_state_t state() const;
 
@@ -72,6 +60,8 @@ public:
     void setPosition(qreal pos);
 
     const QSize size() const;
+
+    void showSliders();
 
 signals:
     void loaded();
@@ -87,7 +77,6 @@ private:
     static void libvlc_callback(const libvlc_event_t *event, void *data);
 
     VideoView *m_view;
-    WId m_currentWId;
 
     QSlider *m_progressSlider {nullptr};
     QSlider *m_volumeSlider {nullptr};

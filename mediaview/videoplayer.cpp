@@ -1,14 +1,11 @@
 #include "videoplayer.h"
-#include "config.h"
 
-#include <QFrame>
+#include <QProxyStyle>
 #include <QDir>
 #include <QHBoxLayout>
 #include <QSlider>
 #include <QLabel>
-#include <QDebug>
 
-#include <vlc/libvlc.h>
 #include <vlc/libvlc_events.h>
 #include <vlc/libvlc_media_player.h>
 #include <vlc_variables.h>
@@ -28,6 +25,14 @@ WId VideoView::window()
 {
     return winId();
 }
+
+//! This makes QSliders set their position strictly to the pointed position instead of stepping
+class QSliderStyle : public QProxyStyle
+{
+public:
+    using QProxyStyle::QProxyStyle;
+    virtual int styleHint(QStyle::StyleHint hint, const QStyleOption *option = 0, const QWidget *widget = 0, QStyleHintReturn *returnData = 0) const override;
+};
 
 int QSliderStyle::styleHint(QStyle::StyleHint hint, const QStyleOption *option, const QWidget *widget, QStyleHintReturn *returnData) const
 {
@@ -78,6 +83,9 @@ VideoPlayer::~VideoPlayer()
     for(const auto &event : playerEvents) {
         libvlc_event_detach(m_vlcEvents, event, libvlc_callback, this);
     }
+
+    libvlc_media_player_release(m_vlcMediaPlayer);
+    libvlc_release(m_vlc);
 }
 
 #define UNUSED(...) (void)__VA_ARGS__
@@ -134,6 +142,98 @@ void VideoPlayer::setWidgets(VideoView *view, QSlider *progress, QSlider *volume
     connect(&m_slidersTimer, &QTimer::timeout, m_volumeSlider, &QSlider::hide);
 }
 
+bool VideoPlayer::load(const QString &file)
+{
+    m_currentFile = file;
+
+    if(m_vlcMedia) {
+        libvlc_media_release(m_vlcMedia);
+    }
+    QString l = QDir::toNativeSeparators(m_currentFile);
+    m_vlcMedia = libvlc_media_new_path(m_vlc, l.toUtf8().data());
+    libvlc_media_player_set_media(m_vlcMediaPlayer, m_vlcMedia);
+    if (m_view) {
+        libvlc_media_player_set_hwnd(m_vlcMediaPlayer, (void *)m_view->window());
+    }
+    play();
+
+    showSliders();
+
+    return true;
+}
+
+void VideoPlayer::play()
+{
+    if (!m_vlcMediaPlayer) {
+        return;
+    }
+
+    libvlc_media_player_play(m_vlcMediaPlayer);
+}
+
+void VideoPlayer::replay()
+{
+    setPosition(0.0);
+    play();
+}
+
+void VideoPlayer::rewind(Direction dir, qreal step)
+{
+    m_userChangedVideoPos = true;
+
+    if(dir == Direction::Backward) {
+        step *= -1;
+    }
+
+    setPosition(position() + step);
+}
+
+void VideoPlayer::pause()
+{
+    if (!m_vlcMediaPlayer) {
+        return;
+    }
+
+    if (libvlc_media_player_can_pause(m_vlcMediaPlayer)) {
+        libvlc_media_player_pause(m_vlcMediaPlayer);
+    }
+}
+
+void VideoPlayer::resume()
+{
+    auto s = state();
+    if(s == libvlc_Paused) {
+        if (!m_vlcMediaPlayer) {
+            return;
+        }
+
+        if (libvlc_media_player_can_pause(m_vlcMediaPlayer)) {
+            libvlc_media_player_set_pause(m_vlcMediaPlayer, false);
+        }
+    } else if(s == libvlc_Ended) {
+        replay();
+    }
+}
+
+void VideoPlayer::toggle()
+{
+    auto s = state();
+    if(s == libvlc_Paused || s == libvlc_Playing) {
+        pause();
+    } else if(s == libvlc_Ended) {
+        resume();
+    }
+}
+
+void VideoPlayer::stop()
+{
+    if (!m_vlcMediaPlayer) {
+        return;
+    }
+
+    libvlc_media_player_stop(m_vlcMediaPlayer);
+}
+
 libvlc_state_t VideoPlayer::state() const
 {
     if (!libvlc_media_player_get_media(m_vlcMediaPlayer)) {
@@ -176,122 +276,6 @@ void VideoPlayer::setPosition(qreal pos)
     libvlc_media_player_set_position(m_vlcMediaPlayer, pos);
 }
 
-bool VideoPlayer::load(const QString &file)
-{
-    m_currentFile = file;
-
-    reload();
-
-    return true;
-}
-
-bool VideoPlayer::reload()
-{
-    if(m_vlcMedia) {
-        libvlc_media_release(m_vlcMedia);
-    }
-    QString l = QDir::toNativeSeparators(m_currentFile);
-    m_vlcMedia = libvlc_media_new_path(m_vlc, l.toUtf8().data());
-    open();
-    play();
-
-    showSliders();
-
-    return true;
-}
-
-void VideoPlayer::open()
-{
-    libvlc_media_player_set_media(m_vlcMediaPlayer, m_vlcMedia);
-}
-
-void VideoPlayer::play()
-{
-    if (!m_vlcMediaPlayer) {
-        return;
-    }
-
-    if (m_view) {
-        m_currentWId = m_view->window();
-    } else {
-        m_currentWId = 0;
-    }
-
-    if (m_currentWId) {
-        libvlc_media_player_set_hwnd(m_vlcMediaPlayer, (void *)m_currentWId);
-    }
-
-    libvlc_media_player_play(m_vlcMediaPlayer);
-}
-
-void VideoPlayer::rewind(Direction dir, qreal step)
-{
-    m_userChangedVideoPos = true;
-
-    if(dir == Direction::Backward) {
-        step *= -1;
-    }
-
-    setPosition(position() + step);
-}
-
-void VideoPlayer::showSliders()
-{
-    m_progressSlider->show();
-    m_volumeSlider->show();
-
-    m_slidersTimer.start(2000);
-}
-
-void VideoPlayer::pause()
-{
-    if (!m_vlcMediaPlayer) {
-        return;
-    }
-
-    if (libvlc_media_player_can_pause(m_vlcMediaPlayer)) {
-        libvlc_media_player_pause(m_vlcMediaPlayer);
-    }
-}
-
-void VideoPlayer::resume()
-{
-    auto s = state();
-    if(s == libvlc_Paused) {
-        if (!m_vlcMediaPlayer) {
-            return;
-        }
-
-        if (libvlc_media_player_can_pause(m_vlcMediaPlayer)) {
-            libvlc_media_player_set_pause(m_vlcMediaPlayer, false);
-        }
-    } else if(s == libvlc_Ended) {
-        setPosition(0.0);
-        play();
-    }
-}
-
-void VideoPlayer::toggle()
-{
-    auto s = state();
-    if(s == libvlc_Paused || s == libvlc_Playing) {
-        pause();
-    } else if(s == libvlc_Ended) {
-        reload();
-    }
-}
-
-void VideoPlayer::stop()
-{
-    if (!m_vlcMediaPlayer) {
-        return;
-    }
-
-    m_currentWId = 0;
-
-    libvlc_media_player_stop(m_vlcMediaPlayer);
-}
-
 const QSize VideoPlayer::size() const
 {
     unsigned x = 640;
@@ -302,6 +286,14 @@ const QSize VideoPlayer::size() const
     }
 
     return QSize(x, y);
+}
+
+void VideoPlayer::showSliders()
+{
+    m_progressSlider->show();
+    m_volumeSlider->show();
+
+    m_slidersTimer.start(2000);
 }
 
 void VideoPlayer::libvlc_callback(const libvlc_event_t *event, void *data)
@@ -338,8 +330,8 @@ void VideoPlayer::libvlc_callback(const libvlc_event_t *event, void *data)
         break;
     }
 
-    if (event->type >= libvlc_MediaPlayerNothingSpecial
-        && event->type <= libvlc_MediaPlayerEncounteredError) {
+    if(event->type >= libvlc_MediaPlayerNothingSpecial
+    && event->type <= libvlc_MediaPlayerEncounteredError) {
         auto s = c.state();
         // unknown codec case
         if(s == libvlc_Error) {
