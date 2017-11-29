@@ -176,7 +176,7 @@
             </spacer>
            </item>
            <item row="1" column="1">
-            <widget class="VlcWidgetVideo" name="videoView" native="true">
+            <widget class="aske::VideoView" name="videoView" native="true">
              <property name="palette">
               <palette>
                <active>
@@ -444,9 +444,9 @@ height: 0px;
  <layoutdefault spacing="6" margin="11"/>
  <customwidgets>
   <customwidget>
-   <class>VlcWidgetVideo</class>
+   <class>aske::VideoView</class>
    <extends>QWidget</extends>
-   <header location="global">VLCQtWidgets/WidgetVideo.h</header>
+   <header location="global">mediaview/videoplayer.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

@@ -18,11 +18,10 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_settings("PitM", "Pork")
-    , m_videoPlayer(this)
 {
     ui->setupUi(this);
     m_videoPlayer.setWidgets(ui->videoView, ui->progressSlider, ui->volumeSlider, ui->codecErrorLabel);
-    connect(&m_videoPlayer, &VideoPlayer::loaded, [this](){calcVideoFactor(m_videoPlayer.size());});
+    connect(&m_videoPlayer, &aske::VideoPlayer::loaded, this, [this](){calcVideoFactor(m_videoPlayer.size());}, Qt::QueuedConnection);
     ui->fileNameLabel->setContentsMargins(tune::info::fileName::pad, tune::info::fileName::pad, 0, 0);
 
     block(ui->scrollArea);
@@ -246,7 +245,7 @@ void MainWindow::calcImageFactor()
     constexpr qreal orig {tune::zoom::origin};
 
     if(wRatio < orig || hRatio < orig) {
-        m_scaleFactor = std::min(wRatio, hRatio);
+        m_scaleFactor = qMin(wRatio, hRatio);
     } else {
         m_scaleFactor = orig;
     }
@@ -304,7 +303,7 @@ void MainWindow::applyGif()
 
 void MainWindow::videoRewind(Direction dir)
 {
-    m_videoPlayer.rewind(dir);
+    m_videoPlayer.rewind(dir, tune::video::rewind);
 }
 
 bool MainWindow::zoom(Direction dir, InputType type)

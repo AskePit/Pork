@@ -1,7 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include "videoplayer.h"
+#include "mediaview/videoplayer.h"
 
 #include <QMainWindow>
 #include <QElapsedTimer>
@@ -35,6 +35,8 @@ enum MediaMode
     Gif,
     Video
 };
+
+typedef aske::VideoPlayer::Direction Direction;
 
 class MainWindow : public QMainWindow
 {
@@ -85,7 +87,7 @@ private:
 
     QImage m_image;
     QMovie m_gifPlayer;
-    VideoPlayer m_videoPlayer;
+    aske::VideoPlayer m_videoPlayer;
 
     QSize m_gifOriginalSize;
     qreal m_scaleFactor { 1.0 };

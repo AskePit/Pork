@@ -11,20 +11,6 @@ class QLabel;
 
 namespace pork {
 
-enum Direction
-{
-    Backward = 0,
-    Forward,
-};
-
-//! This makes QSliders set their position strictly to the pointed position instead of stepping
-class QSliderStyle : public QProxyStyle
-{
-public:
-    using QProxyStyle::QProxyStyle;
-    virtual int styleHint(QStyle::StyleHint hint, const QStyleOption *option = 0, const QWidget *widget = 0, QStyleHintReturn *returnData = 0) const override;
-};
-
 //! Blocks undesired events for a widget
 class Blocker : public QWidget
 {

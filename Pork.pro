@@ -24,19 +24,28 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 
 SOURCES += \
-        main.cpp \
-        mainwindow.cpp \
+    main.cpp \
+    mainwindow.cpp \
     utils.cpp \
-    videoplayer.cpp
+    mediaview/videoplayer.cpp
 
 HEADERS += \
-        mainwindow.h \
+    mainwindow.h \
     utils.h \
     config.h \
-    videoplayer.h
+    mediaview/videoplayer.h
 
 FORMS += \
-        mainwindow.ui
+    mainwindow.ui
 
-INCLUDEPATH += $$PWD/../qtvlc/include
-LIBS += -L$$PWD/../qtvlc/lib -lVLCQtCore -lVLCQtWidgets
+INCLUDEPATH += \
+    $$PWD/../vlc/include
+
+CONFIG(debug, debug|release) {
+    LIB_SUFF=d
+}
+
+LIBS += \
+    -L$$PWD/../vlc/lib \
+    -llibvlccore \
+    -llibvlc
