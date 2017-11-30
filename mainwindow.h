@@ -1,11 +1,9 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include "mediaview/videoplayer.h"
+#include "mediawidget/videoplayer.h"
 
 #include <QMainWindow>
-#include <QElapsedTimer>
-#include <QMovie>
 #include <QFileInfo>
 #include <QSettings>
 
@@ -23,21 +21,6 @@ enum AppMode
     Fullscreen,
 };
 
-enum InputType
-{
-    Button = 0,
-    Wheel
-};
-
-enum MediaMode
-{
-    Image = 0,
-    Gif,
-    Video
-};
-
-typedef aske::VideoPlayer::Direction Direction;
-
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -48,30 +31,13 @@ public:
 
 public:
     void setAppMode(AppMode type);
-    void setMediaMode(MediaMode type);
+
 
     bool openFile(const QString &fileName);
-    bool loadFile();
-    bool loadImage();
-    bool loadGif();
-    bool loadVideo();
-    void calcImageFactor();
-    void calcVideoFactor(const QSizeF &nativeSize);
-    void resetScale();
-    void applyImage();
-    void applyGif();
-    void gotoNextFile(Direction dir);
-    bool dragImage(QPoint p);
-
-    void videoRewind(Direction dir);
-    bool zoom(Direction dir, InputType type);
-    bool volumeStep(Direction dir, InputType type);
-
-    void onClick();
 
 protected:
-    virtual void resizeEvent(QResizeEvent *event) override;
-    virtual bool event(QEvent *event) override;
+    virtual bool event(QEvent *event);
+    virtual void resizeEvent(QResizeEvent *event);
     virtual void dragEnterEvent(QDragEnterEvent *event) override;
     virtual void dropEvent(QDropEvent *event) override;
 
@@ -79,22 +45,9 @@ private:
     Ui::MainWindow *ui;
 
     QSettings m_settings;
-
-    MediaMode m_mediaMode { MediaMode::Image };
     AppMode m_appMode { AppMode::DragDialog };
-
-    QFileInfo m_currentFile;
-
-    QImage m_image;
-    QMovie m_gifPlayer;
-    aske::VideoPlayer m_videoPlayer;
-
-    QSize m_gifOriginalSize;
-    qreal m_scaleFactor { 1.0 };
-    QElapsedTimer m_zoomTimer;
+    QString m_currentFile;
     QTimer m_fileNameTimer;
-    QPoint m_clickPoint;
-    bool m_mouseDraging { false };
 };
 
 } // namespace pork

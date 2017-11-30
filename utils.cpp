@@ -1,48 +1,10 @@
 #include "utils.h"
 #include "config.h"
 
-#include <QScrollArea>
-#include <QScrollBar>
 #include <QEvent>
-#include <QDirIterator>
-#include <QApplication>
-#include <QDesktopWidget>
 #include <QLabel>
 
 namespace pork {
-
-bool Blocker::eventFilter(QObject *watched, QEvent *event)
-{
-    switch(event->type()) {
-        case QEvent::MouseButtonPress:
-        case QEvent::MouseButtonRelease:
-        case QEvent::MouseMove:
-        case QEvent::KeyPress:
-        case QEvent::Wheel:
-            event->ignore();
-            return true;
-
-        default:
-            return QWidget::eventFilter(watched, event);
-    }
-}
-
-static Blocker *blocker { nullptr };
-
-void block(QAbstractScrollArea *w) {
-    if(!blocker) {
-        blocker = new Blocker;
-    }
-    w->installEventFilter(blocker);
-    w->viewport()->installEventFilter(blocker);
-}
-
-void block(QWidget *w) {
-    if(!blocker) {
-        blocker = new Blocker;
-    }
-    w->installEventFilter(blocker);
-}
 
 bool fileBelongsTo(const QString &file, const QStringList &list)
 {
@@ -53,34 +15,6 @@ bool fileBelongsTo(const QString &file, const QStringList &list)
         }
     }
     return false;
-}
-
-QFileInfoList getDirFiles(const QString &path)
-{
-    QFileInfoList res;
-
-    QDirIterator it(path, cap::supportedFormats(), QDir::Files);
-    while(it.hasNext()) {
-        it.next();
-        res << it.fileInfo();
-    }
-    return res;
-}
-
-QRect screen()
-{
-    return QApplication::desktop()->screenGeometry();
-}
-
-void centerScrollArea(QScrollArea *area, QLabel* label)
-{
-    auto screen { QApplication::desktop()->screenGeometry() };
-    auto pixmap { label->pixmap() };
-    int w { (pixmap->width() - screen.width() + tune::screen::reserve)/2 };
-    int h { (pixmap->height() - screen.height() + tune::screen::reserve)/2 };
-
-    area->horizontalScrollBar()->setValue(w);
-    area->verticalScrollBar()->setValue(h);
 }
 
 QString toString(QRgb color)

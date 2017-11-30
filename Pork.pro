@@ -27,13 +27,15 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     utils.cpp \
-    mediaview/videoplayer.cpp
+    mediawidget/videoplayer.cpp \
+    mediawidget/mediawidget.cpp
 
 HEADERS += \
     mainwindow.h \
     utils.h \
     config.h \
-    mediaview/videoplayer.h
+    mediawidget/videoplayer.h \
+    mediawidget/mediawidget.h
 
 FORMS += \
     mainwindow.ui
