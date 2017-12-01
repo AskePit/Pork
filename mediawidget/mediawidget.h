@@ -28,7 +28,8 @@ enum InputType
 
 enum MediaMode
 {
-    Image = 0,
+    No = 0,
+    Image,
     Gif,
 #ifdef VIDEO_SUPPORT
     Video

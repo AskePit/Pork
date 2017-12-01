@@ -10,48 +10,9 @@
 #include <QDirIterator>
 #include <functional>
 
+
 namespace aske
 {
-
-//! Blocks undesired events for a widget
-class Blocker : public QWidget
-{
-public:
-    virtual bool eventFilter(QObject *watched, QEvent *event) override;
-};
-
-bool Blocker::eventFilter(QObject *watched, QEvent *event)
-{
-    switch(event->type()) {
-        case QEvent::MouseButtonPress:
-        case QEvent::MouseButtonRelease:
-        case QEvent::MouseMove:
-        case QEvent::KeyPress:
-        case QEvent::Wheel:
-            event->ignore();
-            return true;
-
-        default:
-            return QWidget::eventFilter(watched, event);
-    }
-}
-
-static Blocker *blocker { nullptr };
-
-void block(QAbstractScrollArea *w) {
-    if(!blocker) {
-        blocker = new Blocker;
-    }
-    w->installEventFilter(blocker);
-    w->viewport()->installEventFilter(blocker);
-}
-
-void block(QWidget *w) {
-    if(!blocker) {
-        blocker = new Blocker;
-    }
-    w->installEventFilter(blocker);
-}
 
 bool fileBelongsTo(const QString &file, const QStringList &list)
 {
@@ -101,17 +62,20 @@ MediaWidget::MediaWidget(QWidget *parent)
     , m_videoWidget(&m_mediaWidget)
 #endif
 {
+    setWidgetResizable(true);
+    setWidget(&m_mediaWidget);
+
     m_mediaWidget.setMouseTracking(true);
     m_mediaWidgetLayout.setSpacing(0);
     m_mediaWidgetLayout.setContentsMargins(0, 0, 0, 0);
+    m_mediaWidget.setStyleSheet("QWidget{ background-color: white; }");
 
-    QSizePolicy sizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
-    sizePolicy.setHorizontalStretch(0);
-    sizePolicy.setVerticalStretch(0);
-    sizePolicy.setHeightForWidth(m_imageView.sizePolicy().hasHeightForWidth());
-    m_imageView.setSizePolicy(sizePolicy);
+    m_imageView.setAlignment(Qt::AlignHCenter | Qt::AlignCenter);
+    m_imageView.setContentsMargins(0, 0, 0, 0);
+    m_imageView.setStyleSheet("QLabel{ background-color: white; }");
+    m_imageView.setSizePolicy(QSizePolicy::Expanding,
+                              QSizePolicy::Expanding);
     m_imageView.setLineWidth(0);
-    m_imageView.setAlignment(Qt::AlignCenter);
 
     m_mediaWidgetLayout.addWidget(&m_imageView);
 
@@ -120,14 +84,14 @@ MediaWidget::MediaWidget(QWidget *parent)
     m_mediaWidgetLayout.addWidget(&m_videoWidget);
 #endif
 
-    block(this);
+    setMouseTracking(true);
+
 #ifdef VIDEO_SUPPORT
     m_videoPlayer.setWidgets(m_videoUi.videoView, m_videoUi.progressSlider, m_videoUi.volumeSlider, m_videoUi.codecErrorLabel);
     connect(&m_videoPlayer, &aske::VideoPlayer::loaded, this, [this](){calcVideoFactor(m_videoPlayer.size());}, Qt::QueuedConnection);
-    block(&m_videoWidget);
 #endif
 
-    setMediaMode(MediaMode::Image);
+    setMediaMode(MediaMode::No);
 }
 
 MediaWidget::~MediaWidget()
@@ -234,7 +198,10 @@ void MediaWidget::setMediaMode(MediaMode type)
     m_videoUi.codecErrorLabel->hide();
     m_imageView.clear();
 
-    if(m_mediaMode == MediaMode::Video) {
+    if(m_mediaMode == MediaMode::No) {
+        m_imageView.hide();
+        m_videoWidget.hide();
+    } else if(m_mediaMode == MediaMode::Video) {
         m_imageView.hide();
         m_videoWidget.show();
         m_zoomTimer.invalidate();

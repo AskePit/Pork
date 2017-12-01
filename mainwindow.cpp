@@ -114,7 +114,7 @@ bool MainWindow::event(QEvent *event)
             auto key { keyEvent->key() };
 
             switch(key) {
-                case Qt::Key_Escape: setAppMode(AppMode::DragDialog); return true;
+                case Qt::Key_Escape: ui->mediaWidget->setMediaMode(aske::MediaMode::No); setAppMode(AppMode::DragDialog); return true;
                 default: break;
             }
         } break;
