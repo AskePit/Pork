@@ -1,12 +1,10 @@
 #ifndef ASKE_MEDIAIDGET_CONFIG_H
 #define ASKE_MEDIAIDGET_CONFIG_H
 
-#include <QRgb>
-
 namespace aske {
 
 //! Capabilities
-namespace cap
+namespace MediaWidgetCapabilities
 {
     const QStringList supportedImages { "*.jpg", "*.jpeg", "*.png", "*.bmp" };
     const QStringList supportedGif { "*.gif" };

@@ -44,7 +44,7 @@ QFileInfoList getDirFiles(const QString &path)
 {
     QFileInfoList res;
 
-    QDirIterator it(path, cap::supportedFormats(), QDir::Files);
+    QDirIterator it(path, MediaWidgetCapabilities::supportedFormats(), QDir::Files);
     while(it.hasNext()) {
         it.next();
         res << it.fileInfo();
@@ -126,20 +126,22 @@ void MediaWidget::resizeEvent(QResizeEvent *event)
 
 bool MediaWidget::loadFile(const QString &fileName)
 {
+    using namespace MediaWidgetCapabilities;
+
     m_currentFile = QFileInfo(fileName);
 
     QString filePath { m_currentFile.absoluteFilePath() };
 
-    if(fileBelongsTo(filePath, cap::supportedImages)) {
+    if(fileBelongsTo(filePath, supportedImages)) {
         return loadImage();
     }
 
-    if(fileBelongsTo(filePath, cap::supportedGif)) {
+    if(fileBelongsTo(filePath, supportedGif)) {
         return loadGif();
     }
 
 #ifdef VIDEO_SUPPORT
-    if(fileBelongsTo(filePath, cap::supportedVideo)) {
+    if(fileBelongsTo(filePath, supportedVideo)) {
         return loadVideo();
     }
 #endif
