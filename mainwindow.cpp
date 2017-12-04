@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include "utils.h"
+#include "mediawidget/config.h"
 
 #include <QLabel>
 #include <QDropEvent>
@@ -54,9 +55,11 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event)
 
     QString url { data->urls().first().toString() };
 
-    bool pic { fileBelongsTo(url, cap::supportedImages) };
-    bool gif { fileBelongsTo(url, cap::supportedGif) };
-    bool video { fileBelongsTo(url, cap::supportedVideo) };
+    using namespace aske::MediaWidgetCapabilities;
+
+    bool pic { fileBelongsTo(url, supportedImages) };
+    bool gif { fileBelongsTo(url, supportedGif) };
+    bool video { fileBelongsTo(url, supportedVideo) };
 
     if(!pic && !gif && !video) {
         event->ignore();
