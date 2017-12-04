@@ -1,11 +1,10 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include "mediawidget/videoplayer.h"
-
 #include <QMainWindow>
 #include <QFileInfo>
 #include <QSettings>
+#include <QTimer>
 
 namespace Ui {
 class MainWindow;

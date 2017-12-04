@@ -3,7 +3,7 @@
 
 #include "config.h"
 #include "utils.h"
-#include "mediawidget/config.h"
+#include "widgets/mediawidget/config.h"
 
 #include <QLabel>
 #include <QDropEvent>
@@ -59,7 +59,11 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event)
 
     bool pic { fileBelongsTo(url, supportedImages) };
     bool gif { fileBelongsTo(url, supportedGif) };
+#ifdef ASKELIB_USE_VLC
     bool video { fileBelongsTo(url, supportedVideo) };
+#else
+    bool video {false};
+#endif
 
     if(!pic && !gif && !video) {
         event->ignore();
