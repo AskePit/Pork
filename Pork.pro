@@ -35,7 +35,8 @@ HEADERS += \
     utils.h \
     config.h \
     mediawidget/videoplayer.h \
-    mediawidget/mediawidget.h
+    mediawidget/mediawidget.h \
+    mediawidget/config.h
 
 FORMS += \
     mainwindow.ui

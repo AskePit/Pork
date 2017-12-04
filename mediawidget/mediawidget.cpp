@@ -99,6 +99,7 @@ MediaWidget::~MediaWidget()
 
 }
 
+#ifdef VIDEO_SUPPORT
 void MediaWidget::resizeEvent(QResizeEvent *event)
 {
     QRect window { QPoint{}, event->size()};
@@ -115,10 +116,12 @@ void MediaWidget::resizeEvent(QResizeEvent *event)
     progress.moveBottom(window.bottom()-pad/2);
     progress.setWidth(window.width()-2*pad);
 
+
     m_videoUi.codecErrorLabel->setGeometry(label);
     m_videoUi.volumeSlider->setGeometry(volume);
     m_videoUi.progressSlider->setGeometry(progress);
 }
+#endif
 
 bool MediaWidget::loadFile(const QString &fileName)
 {
@@ -134,9 +137,11 @@ bool MediaWidget::loadFile(const QString &fileName)
         return loadGif();
     }
 
+#ifdef VIDEO_SUPPORT
     if(fileBelongsTo(filePath, cap::supportedVideo)) {
         return loadVideo();
     }
+#endif
 
     return false;
 }
@@ -177,6 +182,7 @@ bool MediaWidget::loadGif()
     return true;
 }
 
+#ifdef VIDEO_SUPPORT
 bool MediaWidget::loadVideo()
 {
     QString filePath { m_currentFile.absoluteFilePath() };
@@ -188,27 +194,34 @@ bool MediaWidget::loadVideo()
 
     return true;
 }
+#endif
 
 void MediaWidget::setMediaMode(MediaMode type)
 {
     m_mediaMode = type;
     m_scaleFactor = tune::zoom::origin;
+#ifdef VIDEO_SUPPORT
     m_videoUi.progressSlider->setValue(0);
     m_videoUi.volumeSlider->setValue(0);
     m_videoUi.codecErrorLabel->hide();
+#endif
     m_imageView.clear();
 
     if(m_mediaMode == MediaMode::No) {
         m_imageView.hide();
+#ifdef VIDEO_SUPPORT
         m_videoWidget.hide();
     } else if(m_mediaMode == MediaMode::Video) {
         m_imageView.hide();
         m_videoWidget.show();
         m_zoomTimer.invalidate();
+#endif
     } else {
+#ifdef VIDEO_SUPPORT
         m_videoPlayer.stop();
-        m_gifPlayer.stop();
         m_videoWidget.hide();
+#endif
+        m_gifPlayer.stop();
         m_imageView.show();
         m_zoomTimer.start();
     }
@@ -233,6 +246,7 @@ void MediaWidget::calcImageFactor()
     }
 }
 
+#ifdef VIDEO_SUPPORT
 void MediaWidget::calcVideoFactor(const QSizeF &nativeSize)
 {
     QSize screenSize { size() };
@@ -256,6 +270,7 @@ void MediaWidget::calcVideoFactor(const QSizeF &nativeSize)
     m_videoUi.videoView->setMaximumSize(geom.size().toSize());
     m_videoUi.videoView->setMinimumSize(geom.size().toSize());
 }
+#endif
 
 void MediaWidget::resetScale()
 {
@@ -283,16 +298,20 @@ void MediaWidget::applyGif()
     m_gifPlayer.setScaledSize(m_gifOriginalSize*m_scaleFactor);
 }
 
+#ifdef VIDEO_SUPPORT
 void MediaWidget::videoRewind(Direction dir)
 {
     m_videoPlayer.rewind(dir, tune::video::rewind);
 }
+#endif
 
 bool MediaWidget::zoom(Direction dir, InputType type)
 {
+#ifdef VIDEO_SUPPORT
     if(m_mediaMode == MediaMode::Video) {
         return false;
     }
+#endif
 
     qreal factor { tune::zoom::factors[dir][type] };
 
@@ -321,6 +340,7 @@ bool MediaWidget::zoom(Direction dir, InputType type)
     return true;
 }
 
+#ifdef VIDEO_SUPPORT
 bool MediaWidget::volumeStep(Direction dir, InputType type)
 {
     int value {m_videoUi.volumeSlider->value()};
@@ -336,6 +356,7 @@ bool MediaWidget::volumeStep(Direction dir, InputType type)
     m_videoUi.volumeSlider->setValue(value);
     return true;
 }
+#endif
 
 void MediaWidget::gotoNextFile(Direction dir)
 {
@@ -380,10 +401,12 @@ bool MediaWidget::dragImage(QPoint p)
 
 void MediaWidget::onClick()
 {
+#ifdef VIDEO_SUPPORT
     QWidget *w { m_videoUi.videoView->childAt(m_clickPoint) };
     if(w == m_videoUi.volumeSlider || w == m_videoUi.progressSlider) {
         return;
     }
+#endif
 
     int screenWidth { size().width() };
     int x { m_clickPoint.x() };
@@ -394,30 +417,46 @@ void MediaWidget::onClick()
         gotoNextFile(Direction::Backward);
     } else if(rx >= tune::screen::forwardSection) {
         gotoNextFile(Direction::Forward);
-    }  else {
+
+#ifdef VIDEO_SUPPORT
+    } else {
         if(m_mediaMode == MediaMode::Video) {
             m_videoPlayer.toggle();
         }
+#endif
     }
 }
 
 
 #define imageMode m_mediaMode == MediaMode::Image
 #define gifMode   m_mediaMode == MediaMode::Gif
+#ifdef VIDEO_SUPPORT
 #define videoMode m_mediaMode == MediaMode::Video
+#endif
 
 bool MediaWidget::event(QEvent *event)
 {
     using namespace std::placeholders;
-    auto zoomOrVolumeStep = std::bind(videoMode ? &MediaWidget::volumeStep : &MediaWidget::zoom, this, _1, _2);
+    auto zoomOrVolumeStep = std::bind(
+#ifdef VIDEO_SUPPORT
+                videoMode ? &MediaWidget::volumeStep :
+#endif
+                            &MediaWidget::zoom, this, _1, _2);
 
     switch(event->type()) {
         case QEvent::KeyPress: {
             QKeyEvent *keyEvent { static_cast<QKeyEvent *>(event) };
             auto key { keyEvent->key() };
-            bool ctrl { keyEvent->modifiers() & Qt::ControlModifier };
 
-            auto rewindOrGotoNext = std::bind(videoMode && ctrl ? &MediaWidget::videoRewind : &MediaWidget::gotoNextFile, this, _1);
+#ifdef VIDEO_SUPPORT
+            bool ctrl { keyEvent->modifiers() & Qt::ControlModifier };
+#endif
+
+            auto rewindOrGotoNext = std::bind(
+#ifdef VIDEO_SUPPORT
+                        videoMode && ctrl ? &MediaWidget::videoRewind :
+#endif
+                                            &MediaWidget::gotoNextFile, this, _1);
 
             switch(key) {
                 case Qt::Key_Left:   rewindOrGotoNext(Direction::Backward); return true;
@@ -426,7 +465,13 @@ bool MediaWidget::event(QEvent *event)
                 case Qt::Key_Up:     zoomOrVolumeStep(Direction::Forward, InputType::Button); return true;
                 case Qt::Key_Minus:
                 case Qt::Key_Down:   zoomOrVolumeStep(Direction::Backward, InputType::Button); return true;
-                case Qt::Key_Space:  videoMode ? m_videoPlayer.toggle() : resetScale(); return true;
+                case Qt::Key_Space:
+#ifdef VIDEO_SUPPORT
+                                     if(videoMode) m_videoPlayer.toggle(); return true;
+#else
+                //[[fallthrough]]
+#endif
+
                 case Qt::Key_Return: resetScale(); return true;
                 default: break;
             }
@@ -452,9 +497,11 @@ bool MediaWidget::event(QEvent *event)
         } break;
 
         case QEvent::MouseMove: {
+#ifdef VIDEO_SUPPORT
             if(videoMode) {
                 m_videoPlayer.showSliders();
             }
+#endif
 
             QMouseEvent *moveEvent { static_cast<QMouseEvent *>(event) };
             bool isLeftClicked { moveEvent->buttons() & Qt::LeftButton };
@@ -469,5 +516,11 @@ bool MediaWidget::event(QEvent *event)
 
     return QScrollArea::event(event);
 }
+
+#undef imageMode
+#undef gifMode
+#ifdef VIDEO_SUPPORT
+#undef videoMode
+#endif
 
 } // namespace aske

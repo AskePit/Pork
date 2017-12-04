@@ -68,7 +68,9 @@ public:
     void onClick();
 
 protected:
+#ifdef VIDEO_SUPPORT
     virtual void resizeEvent(QResizeEvent *event) override;
+#endif
     virtual bool event(QEvent *event) override;
 	
 private:
