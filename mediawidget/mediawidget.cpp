@@ -10,7 +10,6 @@
 #include <QDirIterator>
 #include <functional>
 
-
 namespace aske
 {
 
@@ -34,8 +33,8 @@ void centerScrollArea(QScrollArea *area, QLabel* label)
 {
     auto screen { QApplication::desktop()->screenGeometry() };
     auto pixmap { label->pixmap() };
-    int w { (pixmap->width() - screen.width() + tune::screen::reserve)/2 };
-    int h { (pixmap->height() - screen.height() + tune::screen::reserve)/2 };
+    int w { (pixmap->width() - screen.width() + MediaWidgetTune::screen::reserve)/2 };
+    int h { (pixmap->height() - screen.height() + MediaWidgetTune::screen::reserve)/2 };
 
     area->horizontalScrollBar()->setValue(w);
     area->verticalScrollBar()->setValue(h);
@@ -102,12 +101,14 @@ MediaWidget::~MediaWidget()
 #ifdef VIDEO_SUPPORT
 void MediaWidget::resizeEvent(QResizeEvent *event)
 {
+    using namespace MediaWidgetTune;
+
     QRect window { QPoint{}, event->size()};
     QRect label { m_videoUi.codecErrorLabel->rect() };
     QRect volume { m_videoUi.volumeSlider->rect() };
     QRect progress { m_videoUi.progressSlider->rect() };
 
-    constexpr int pad { tune::slider::pad };
+    constexpr int pad { slider::pad };
 
     label.moveCenter(window.center());
     volume.moveRight(window.right()-pad/2);
@@ -189,17 +190,16 @@ bool MediaWidget::loadVideo()
     setMediaMode(MediaMode::Video);
     m_videoPlayer.load(filePath);
 
-    qDebug() << "load complete";
-    //QTimer::singleShot(tune::video::bufferingTime, [this](){qDebug() << "CALC!!"; calcVideoFactor(m_videoPlayer.size());});
-
     return true;
 }
 #endif
 
 void MediaWidget::setMediaMode(MediaMode type)
 {
+    using namespace MediaWidgetTune;
+
     m_mediaMode = type;
-    m_scaleFactor = tune::zoom::origin;
+    m_scaleFactor = zoom::origin;
 #ifdef VIDEO_SUPPORT
     m_videoUi.progressSlider->setValue(0);
     m_videoUi.volumeSlider->setValue(0);
@@ -232,12 +232,12 @@ void MediaWidget::calcImageFactor()
     int w { m_image.width() };
     int h { m_image.height() };
 
-    qreal sW = screen().width() - tune::screen::reserve;
-    qreal sH = screen().height() - tune::screen::reserve;
+    qreal sW = screen().width() - MediaWidgetTune::screen::reserve;
+    qreal sH = screen().height() - MediaWidgetTune::screen::reserve;
 
     qreal wRatio { sW/w };
     qreal hRatio { sH/h };
-    constexpr qreal orig {tune::zoom::origin};
+    constexpr qreal orig {MediaWidgetTune::zoom::origin};
 
     if(wRatio < orig || hRatio < orig) {
         m_scaleFactor = qMin(wRatio, hRatio);
@@ -274,18 +274,22 @@ void MediaWidget::calcVideoFactor(const QSizeF &nativeSize)
 
 void MediaWidget::resetScale()
 {
+    using namespace MediaWidgetTune;
+
     if(m_mediaMode == MediaMode::Image) {
         calcImageFactor();
         applyImage();
     } else if(m_mediaMode == MediaMode::Gif) {
-        m_scaleFactor = tune::zoom::origin;
+        m_scaleFactor = zoom::origin;
         applyGif();
     }
 }
 
 void MediaWidget::applyImage()
 {
-    if(m_scaleFactor == tune::zoom::origin) {
+    using namespace MediaWidgetTune;
+
+    if(m_scaleFactor == zoom::origin) {
         m_imageView.setPixmap(QPixmap::fromImage(m_image));
     } else {
         m_imageView.setPixmap(QPixmap::fromImage(m_image)
@@ -301,30 +305,34 @@ void MediaWidget::applyGif()
 #ifdef VIDEO_SUPPORT
 void MediaWidget::videoRewind(Direction dir)
 {
-    m_videoPlayer.rewind(dir, tune::video::rewind);
+    using namespace MediaWidgetTune;
+
+    m_videoPlayer.rewind(dir, video::rewind);
 }
 #endif
 
 bool MediaWidget::zoom(Direction dir, InputType type)
 {
+    using namespace MediaWidgetTune;
+
 #ifdef VIDEO_SUPPORT
     if(m_mediaMode == MediaMode::Video) {
         return false;
     }
 #endif
 
-    qreal factor { tune::zoom::factors[dir][type] };
+    qreal factor { zoom::factors[dir][type] };
 
     qreal result { m_scaleFactor + factor };
-    if(result <= tune::zoom::min) {
+    if(result <= zoom::min) {
         return false;
     }
 
-    if(result >= tune::zoom::max) {
+    if(result >= zoom::max) {
         return false;
     }
 
-    if(m_zoomTimer.elapsed() > tune::zoom::delay) {
+    if(m_zoomTimer.elapsed() > zoom::delay) {
         m_scaleFactor = result;
 
         if(m_mediaMode == MediaMode::Image) {
@@ -343,16 +351,18 @@ bool MediaWidget::zoom(Direction dir, InputType type)
 #ifdef VIDEO_SUPPORT
 bool MediaWidget::volumeStep(Direction dir, InputType type)
 {
+    using namespace MediaWidgetTune;
+
     int value {m_videoUi.volumeSlider->value()};
 
-    if((value == tune::volume::min && dir == Direction::Backward)
-    || (value == tune::volume::max && dir == Direction::Forward)) {
+    if((value == volume::min && dir == Direction::Backward)
+    || (value == volume::max && dir == Direction::Forward)) {
         return false;
     }
 
-    value += tune::volume::factors[dir][type];
+    value += volume::factors[dir][type];
 
-    value = qBound(tune::volume::min, value, tune::volume::max);
+    value = qBound(volume::min, value, volume::max);
     m_videoUi.volumeSlider->setValue(value);
     return true;
 }
@@ -401,6 +411,8 @@ bool MediaWidget::dragImage(QPoint p)
 
 void MediaWidget::onClick()
 {
+    using namespace MediaWidgetTune;
+
 #ifdef VIDEO_SUPPORT
     QWidget *w { m_videoUi.videoView->childAt(m_clickPoint) };
     if(w == m_videoUi.volumeSlider || w == m_videoUi.progressSlider) {
@@ -413,9 +425,9 @@ void MediaWidget::onClick()
 
     qreal rx { x/static_cast<qreal>(screenWidth) };
 
-    if(rx <= tune::screen::backwardSection) {
+    if(rx <= screen::backwardSection) {
         gotoNextFile(Direction::Backward);
-    } else if(rx >= tune::screen::forwardSection) {
+    } else if(rx >= screen::forwardSection) {
         gotoNextFile(Direction::Forward);
 
 #ifdef VIDEO_SUPPORT
