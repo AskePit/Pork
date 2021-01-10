@@ -9,6 +9,7 @@
 #include <VLCQtCore/Media.h>
 #include <VLCQtCore/Video.h>
 #include <VLCQtCore/Audio.h>
+#include <VLCQtCore/ModuleDescription.h>
 #include <VLCQtWidgets/WidgetVideo.h>
 
 namespace pork
@@ -57,7 +58,7 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
             showSliders();
             m_userChangedVideoPos = false;
         } else {
-            m_progressSlider->setValue(position*100);
+            m_progressSlider->setValue(static_cast<int>(position*100));
         }
     });
     connect(m_progressSlider, &QSlider::sliderPressed, [this]() {
@@ -66,7 +67,7 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
     });
     connect(m_progressSlider, &QSlider::sliderReleased, [this]() {
         m_userChangedVideoPos = true;
-        m_player.setPosition(m_progressSlider->value()/100.);
+        m_player.setPosition(static_cast<int>(m_progressSlider->value()/100.));
         resume();
     });
 
@@ -81,7 +82,7 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
     });
 
     connect(&m_player, &VlcMediaPlayer::vout, [this](int count) {
-        Q_UNUSED(count);
+        Q_UNUSED(count)
         emit loaded();
     });
 
@@ -124,7 +125,7 @@ void VideoPlayer::rewind(Direction dir)
         step *= -1;
     }
 
-    m_player.setPosition(m_player.position() + step);
+    m_player.setPosition(m_player.position() + static_cast<float>(step));
 }
 
 void VideoPlayer::showSliders()

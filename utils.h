@@ -43,6 +43,14 @@ void centerScrollArea(QScrollArea *area, QLabel* label);
 inline QString toString(QRgb color);
 void setLabelText(QLabel *label, const QString &text, QRgb color, int fontSize = -1, bool bold = false);
 
+template<class T>
+bool almostEqual(T a, T b)
+{
+    return (a - b) < std::numeric_limits<T>::epsilon();
+}
+
+QStringList toStringList(const QList<QByteArray> list);
+
 } // namespace pork
 
 #endif // UTILS_H

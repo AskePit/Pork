@@ -8,6 +8,7 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QLabel>
+#include <QScreen>
 
 namespace pork {
 
@@ -54,20 +55,40 @@ void block(QWidget *w) {
 
 bool fileBelongsTo(const QString &file, const QStringList &list)
 {
+    int dotIndex = file.lastIndexOf('.');
+    if(dotIndex == -1) {
+        // no extension
+        return false;
+    }
+
+    const int fileExtLength = file.length() - dotIndex - 1;
+    const auto fileExt = file.right(fileExtLength);
+
     for(const auto &ext : list) {
-        QRegExp reg {ext, Qt::CaseInsensitive, QRegExp::Wildcard};
-        if(reg.exactMatch(file)) {
+        if(fileExt.compare(ext, Qt::CaseInsensitive) == 0) {
             return true;
         }
     }
     return false;
 }
 
+QStringList getWildcardsFromExtentions(const QStringList& l)
+{
+    QStringList res;
+    for(const auto& ext : l) {
+        res << "*." + ext;
+    }
+
+    return res;
+}
+
 QFileInfoList getDirFiles(const QString &path)
 {
     QFileInfoList res;
 
-    QDirIterator it(path, cap::supportedFormats(), QDir::Files);
+    static const QStringList filters = getWildcardsFromExtentions(cap::supportedFormats());
+
+    QDirIterator it(path, filters, QDir::Files);
     while(it.hasNext()) {
         it.next();
         res << it.fileInfo();
@@ -77,15 +98,30 @@ QFileInfoList getDirFiles(const QString &path)
 
 QRect screen()
 {
-    return QApplication::desktop()->screenGeometry();
+    const auto& screens = QGuiApplication::screens();
+    if(screens.empty()) {
+        return QRect();
+    }
+
+    auto& fitstScreen = screens.front();
+    if(!fitstScreen) {
+        return QRect();
+    }
+
+    return fitstScreen->geometry();
 }
 
 void centerScrollArea(QScrollArea *area, QLabel* label)
 {
-    auto screen { QApplication::desktop()->screenGeometry() };
+    const auto& screens = QGuiApplication::screens();
+    if(screens.empty()) {
+        return;
+    }
+
+    QRect scr { screen() };
     auto pixmap { label->pixmap() };
-    int w { (pixmap->width() - screen.width() + tune::screen::reserve)/2 };
-    int h { (pixmap->height() - screen.height() + tune::screen::reserve)/2 };
+    int w { (pixmap->width() - scr.width() + tune::screen::reserve)/2 };
+    int h { (pixmap->height() - scr.height() + tune::screen::reserve)/2 };
 
     area->horizontalScrollBar()->setValue(w);
     area->verticalScrollBar()->setValue(h);
@@ -110,7 +146,14 @@ void setLabelText(QLabel *label, const QString &text, QRgb color, int fontSize, 
         newFont.setBold(bold);
         label->setFont(newFont);
     }
+}
 
+QStringList toStringList(const QList<QByteArray> list) {
+    QStringList strings;
+    foreach (const QByteArray &item, list) {
+        strings.append(QString::fromLocal8Bit(item)); // Assuming local 8-bit.
+    }
+    return strings;
 }
 
 } // namespace pork

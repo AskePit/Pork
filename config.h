@@ -1,18 +1,95 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include "utils.h"
 #include <QRgb>
+#include <QImageReader>
+#include <QMovie>
 
 namespace pork {
 
 //! Capabilities
 namespace cap
 {
-    const QStringList supportedImages { "*.jpg", "*.jpeg", "*.png", "*.bmp" };
-    const QStringList supportedGif { "*.gif" };
-    const QStringList supportedVideo { "*.avi", "*.3gp", "*.webm", "*.wmv", "*.mp4", "*.mpg", "*.asf", "*.dvr-ms", "*.flv", "*.f4v", "*.mkv", "*.mov", "*.qt", "*.m4v", "*.ogg", "*.ogv", "*.ts", "*.tsv", "*.mpeg", "*.vob", "*.rm" };
-    inline const QStringList supportedFormats() {
-        return QStringList() << supportedImages << supportedGif << supportedVideo;
+    inline const QStringList& supportedImages() {
+        static const QStringList images { toStringList(QImageReader::supportedImageFormats()) };
+        return images;
+    };
+
+    inline const QStringList& supportedGif() {
+        static const QStringList gifs { toStringList(QMovie::supportedFormats()) };
+        return gifs;
+    };
+
+    inline const QStringList& supportedVideo() {
+        static const QStringList videos {
+            "3g2",
+            "3gp",
+            "a52",
+            "aac",
+            "asf",
+            "amv",
+            "au",
+            "avi",
+            "drc",
+            "dts",
+            "dv"
+            "dvr-ms",
+            "f4a",
+            "f4b",
+            "f4p",
+            "f4v",
+            "flv",
+            "gifv",
+            "m2ts",
+            "m2v",
+            "m4p",
+            "m4v",
+            "mka",
+            "mkv",
+            "mng",
+            "mov",
+            "mp4",
+            "mpe",
+            "mpeg",
+            "mpg",
+            "mpv",
+            "mts",
+            "mxf",
+            "nsc",
+            "nsv",
+            "nut",
+            "ogg",
+            "ogm",
+            "ogv",
+            "qt",
+            "ra",
+            "ram",
+            "rm",
+            "rmbv",
+            "roq",
+            "rv",
+            "svi",
+            "tac",
+            "ts",
+            "tta",
+            "tsv",
+            "ty",
+            "vid",
+            "viv",
+            "vob",
+            "webm",
+            "wmv",
+            "xa",
+            "yuv",
+        };
+
+        return videos;
+    };
+
+    inline const QStringList& supportedFormats() {
+        static const QStringList formats = QStringList() << supportedImages() << supportedGif() << supportedVideo();
+        return formats;
     }
 }
 

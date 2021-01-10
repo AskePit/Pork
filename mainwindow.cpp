@@ -58,11 +58,12 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event)
 
     QString url { data->urls().first().toString() };
 
-    bool pic { fileBelongsTo(url, cap::supportedImages) };
-    bool gif { fileBelongsTo(url, cap::supportedGif) };
-    bool video { fileBelongsTo(url, cap::supportedVideo) };
+    bool pic { fileBelongsTo(url, cap::supportedImages()) };
+    bool gif { fileBelongsTo(url, cap::supportedGif()) };
+    bool video { fileBelongsTo(url, cap::supportedVideo()) };
 
-    if(!pic && !gif && !video) {
+    const bool any {pic || gif || video};
+    if(!any) {
         event->ignore();
         return;
     }
@@ -136,15 +137,18 @@ bool MainWindow::loadFile()
 {
     QString filePath { m_currentFile.absoluteFilePath() };
 
-    if(fileBelongsTo(filePath, cap::supportedImages)) {
-        return loadImage();
-    }
-
-    if(fileBelongsTo(filePath, cap::supportedGif)) {
+    // check gifs first since *.webp is supported both by `QMovie`
+    // and simple `QImageReader`.
+    // but we'll prefer `QMovie` since content may be animated.
+    if(fileBelongsTo(filePath, cap::supportedGif())) {
         return loadGif();
     }
 
-    if(fileBelongsTo(filePath, cap::supportedVideo)) {
+    if(fileBelongsTo(filePath, cap::supportedImages())) {
+        return loadImage();
+    }
+
+    if(fileBelongsTo(filePath, cap::supportedVideo())) {
         return loadVideo();
     }
 
@@ -289,7 +293,7 @@ void MainWindow::resetScale()
 
 void MainWindow::applyImage()
 {
-    if(m_scaleFactor == tune::zoom::origin) {
+    if(almostEqual(m_scaleFactor, tune::zoom::origin)) {
         ui->label->setPixmap(QPixmap::fromImage(m_image));
     } else {
         ui->label->setPixmap(QPixmap::fromImage(m_image)
@@ -349,7 +353,7 @@ bool MainWindow::volumeStep(Direction dir, InputType type)
         return false;
     }
 
-    value += tune::volume::factors[dir][type];
+    value += static_cast<int>(tune::volume::factors[dir][type]);
 
     value = qBound(tune::volume::min, value, tune::volume::max);
     ui->volumeSlider->setValue(value);
@@ -359,6 +363,10 @@ bool MainWindow::volumeStep(Direction dir, InputType type)
 void MainWindow::gotoNextFile(Direction dir)
 {
     QFileInfoList files { getDirFiles(m_currentFile.dir().path()) };
+
+    if(files.empty()) {
+        return;
+    }
 
     int i { files.indexOf(m_currentFile) };
     if(dir == Direction::Backward) {
@@ -438,7 +446,7 @@ bool MainWindow::event(QEvent *event)
         case QEvent::KeyPress: {
             QKeyEvent *keyEvent { static_cast<QKeyEvent *>(event) };
             auto key { keyEvent->key() };
-            bool ctrl { keyEvent->modifiers() & Qt::ControlModifier };
+            bool ctrl { static_cast<bool>(keyEvent->modifiers() & Qt::ControlModifier) };
 
             auto rewindOrGotoNext = std::bind(videoMode && ctrl ? &MainWindow::videoRewind : &MainWindow::gotoNextFile, this, _1);
 
@@ -461,7 +469,7 @@ bool MainWindow::event(QEvent *event)
             Direction dir { wheelEvent->delta() > 0 ? Direction::Forward : Direction::Backward };
             zoomOrVolumeStep(dir, InputType::Wheel);
             return true;
-        } break;
+        }
 
         case QEvent::MouseButtonPress: {
             QMouseEvent *pressEvent { static_cast<QMouseEvent *>(event) };
@@ -481,13 +489,13 @@ bool MainWindow::event(QEvent *event)
             }
 
             QMouseEvent *moveEvent { static_cast<QMouseEvent *>(event) };
-            bool isLeftClicked { moveEvent->buttons() & Qt::LeftButton };
+            bool isLeftClicked { static_cast<bool>(moveEvent->buttons() & Qt::LeftButton) };
             if(!isLeftClicked) {
                 return false;
             }
 
             return dragImage(moveEvent->pos());
-        } break;
+        }
         default: break;
     }
 
