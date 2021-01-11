@@ -23,8 +23,12 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     m_videoPlayer.setWidgets(ui->videoView, ui->progressSlider, ui->volumeSlider, ui->codecErrorLabel);
-    connect(&m_videoPlayer, &VideoPlayer::loaded, [this](){calcVideoFactor(m_videoPlayer.size());});
+    connect(&m_videoPlayer, &VideoPlayer::loaded, this, [this](){
+        calcVideoFactor(m_videoPlayer.videoSize());
+    });
     ui->fileNameLabel->setContentsMargins(tune::info::fileName::pad, tune::info::fileName::pad, 0, 0);
+    ui->progressSlider->setMinimum(0);
+    ui->progressSlider->setMaximum(tune::slider::range-1);
 
     block(ui->scrollArea);
     block(ui->videoPane);
@@ -36,7 +40,7 @@ MainWindow::MainWindow(QWidget *parent)
     setAppMode(AppMode::DragDialog);
 
     restoreGeometry(m_settings.value(tune::reg::dragWindowGeometry).toByteArray());
-    connect(qApp, &QApplication::aboutToQuit, [this]() {
+    connect(qApp, &QApplication::aboutToQuit, this, [this]() {
         if(m_appMode == AppMode::DragDialog) {
             m_settings.setValue(tune::reg::dragWindowGeometry, saveGeometry());
         }
@@ -83,11 +87,16 @@ void MainWindow::dropEvent(QDropEvent *event)
 
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
+    // NOTE: do Not rely on `event->size()`
+    // use `Widget::size()` instead
+    // see `https://stackoverflow.com/questions/52157587/why-qresizeevent-qwidgetsize-gives-different-when-fullscreen`
+    Q_UNUSED(event)
+
     if(m_appMode == AppMode::DragDialog) {
         return;
     }
 
-    QRect window { QPoint{}, event->size()};
+    QRect window { QPoint{}, size()};
     QRect label { ui->codecErrorLabel->rect() };
     QRect volume { ui->volumeSlider->rect() };
     QRect progress { ui->progressSlider->rect() };
@@ -228,12 +237,16 @@ void MainWindow::setMediaMode(MediaMode type)
     if(m_mediaMode == MediaMode::Video) {
         ui->label->hide();
         ui->videoPane->show();
+        ui->scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         m_zoomTimer.invalidate();
     } else {
         m_videoPlayer.stop();
         m_gifPlayer.stop();
         ui->videoPane->hide();
         ui->label->show();
+        ui->scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
         m_zoomTimer.start();
     }
 }
@@ -243,13 +256,8 @@ void MainWindow::calcImageFactor()
     int w { m_image.width() };
     int h { m_image.height() };
 
-    QScreen* scr = screen();
-    if(!scr) {
-        return;
-    }
-
-    qreal sW = scr->geometry().width() - tune::screen::reserve;
-    qreal sH = scr->geometry().height() - tune::screen::reserve;
+    qreal sW = screen().width() - tune::screen::reserve;
+    qreal sH = screen().height() - tune::screen::reserve;
 
     qreal wRatio { sW/w };
     qreal hRatio { sH/h };
@@ -264,7 +272,7 @@ void MainWindow::calcImageFactor()
 
 void MainWindow::calcVideoFactor(const QSizeF &nativeSize)
 {   
-    QSize screenSize { size() };
+    QSize screenSize { size() /*- QSize(30, 30)*/ };
 
     QSizeF s;
 
@@ -278,6 +286,14 @@ void MainWindow::calcVideoFactor(const QSizeF &nativeSize)
     QPointF pos { rect().center() };
     pos.rx() -= s.width()/2.;
     pos.ry() -= s.height()/2.;
+
+    if(pos.x() < 0) {
+        pos.setX(0);
+    }
+
+    if(pos.y() < 0) {
+        pos.setY(0);
+    }
 
     QRectF geom(pos, s);
 

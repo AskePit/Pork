@@ -112,6 +112,7 @@ namespace tune
     {
         constexpr int pad {20};        //! padding from screen border
         constexpr int showTime {2000}; //! time when sliders are shown on a screen after user's last ineraction. in ms
+        constexpr int range {1000};    //! slider `maxValue - minValue` range
     }
 
     namespace zoom

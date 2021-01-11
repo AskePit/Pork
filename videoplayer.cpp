@@ -37,7 +37,7 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
 
     // video volume change
     m_volumeSlider->setRange(tune::volume::min, tune::volume::max);
-    connect(m_volumeSlider, &QSlider::valueChanged, [this](int volume) {
+    connect(m_volumeSlider, &QSlider::valueChanged, this, [this](int volume) {
         if(m_audio) {
             m_audio->setVolume(volume);
         }
@@ -45,7 +45,7 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
     });
 
     // video position change
-    connect(&m_player, &VlcMediaPlayer::positionChanged, [this](float position) {
+    connect(&m_player, &VlcMediaPlayer::positionChanged, this, [this](float position) {
         // first video load resulted in 100 volume anyway. this is a workaround.
         if(m_firstLoad) {
             m_firstLoad = false;
@@ -58,20 +58,19 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
             showSliders();
             m_userChangedVideoPos = false;
         } else {
-            m_progressSlider->setValue(static_cast<int>(position*100));
+            m_progressSlider->setValue(static_cast<int>(position*tune::slider::range));
         }
     });
-    connect(m_progressSlider, &QSlider::sliderPressed, [this]() {
+    connect(m_progressSlider, &QSlider::sliderPressed, this, [this]() {
         m_userChangedVideoPos = true;
-        m_player.pause();
+        m_player.setPosition(m_progressSlider->value()/static_cast<float>(tune::slider::range));
     });
-    connect(m_progressSlider, &QSlider::sliderReleased, [this]() {
+    connect(m_progressSlider, &QSlider::sliderReleased, this, [this]() {
         m_userChangedVideoPos = true;
-        m_player.setPosition(static_cast<int>(m_progressSlider->value()/100.));
-        resume();
+        m_player.setPosition(m_progressSlider->value()/static_cast<float>(tune::slider::range));
     });
 
-    connect(&m_player, &VlcMediaPlayer::stateChanged, [this]() {
+    connect(&m_player, &VlcMediaPlayer::stateChanged, this, [this]() {
         auto state = m_player.state();
         // unknown codec case
         if(state == Vlc::Error) {
@@ -81,7 +80,7 @@ void VideoPlayer::setWidgets(VlcWidgetVideo *view, QSlider *progress, QSlider *v
         }
     });
 
-    connect(&m_player, &VlcMediaPlayer::vout, [this](int count) {
+    connect(&m_player, &VlcMediaPlayer::vout, this, [this](int count) {
         Q_UNUSED(count)
         emit loaded();
     });
@@ -157,7 +156,7 @@ void VideoPlayer::toggle()
     }
 }
 
-const QSizeF VideoPlayer::size()
+const QSizeF VideoPlayer::videoSize()
 {
     return m_player.video()->size();
 }

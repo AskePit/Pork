@@ -328,6 +328,9 @@ width: 0px;
 height: 0px;
 }</string>
            </property>
+           <property name="maximum">
+            <number>999</number>
+           </property>
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
@@ -395,6 +398,10 @@ height: 0px;
             <set>Qt::AlignCenter</set>
            </property>
           </widget>
+          <zorder>videoView</zorder>
+          <zorder>codecErrorLabel</zorder>
+          <zorder>volumeSlider</zorder>
+          <zorder>progressSlider</zorder>
          </widget>
         </item>
         <item>

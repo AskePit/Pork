@@ -31,7 +31,7 @@ public:
 
     void stop() { m_player.stop(); }
 
-    const QSizeF size();
+    const QSizeF videoSize();
 
 signals:
     void loaded();

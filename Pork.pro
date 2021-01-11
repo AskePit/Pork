@@ -39,4 +39,4 @@ FORMS += \
         mainwindow.ui
 
 INCLUDEPATH += $$PWD/../qtvlc/include
-LIBS += -L$$PWD/../qtvlc/lib -lVLCQtCore -lVLCQtWidgets
+LIBS += -L$$PWD/../qtvlc/lib/msvc2019x64 -lVLCQtCore -lVLCQtWidgets
