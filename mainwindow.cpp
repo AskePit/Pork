@@ -10,6 +10,7 @@
 #include <QDir>
 #include <QScrollBar>
 #include <QDebug>
+#include <QScreen>
 #include <functional>
 
 namespace pork {
@@ -242,8 +243,13 @@ void MainWindow::calcImageFactor()
     int w { m_image.width() };
     int h { m_image.height() };
 
-    qreal sW = screen().width() - tune::screen::reserve;
-    qreal sH = screen().height() - tune::screen::reserve;
+    QScreen* scr = screen();
+    if(!scr) {
+        return;
+    }
+
+    qreal sW = scr->geometry().width() - tune::screen::reserve;
+    qreal sH = scr->geometry().height() - tune::screen::reserve;
 
     qreal wRatio { sW/w };
     qreal hRatio { sH/h };
